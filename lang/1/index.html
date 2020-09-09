@@ -15,7 +15,7 @@ mod tests {
     }
 }
 </code></pre><p>Let’s follow TDD some more: what’s the shortest thing we can write that makes this pass? Well, first, we need to make it compile.</p><pre><code>#[derive(Debug, PartialEq)]
-pub struct Number(i32);
+pub struct Number(pub i32);
 
 impl Number {
     pub fn new(s: &amp;str) -&gt; Self {}
