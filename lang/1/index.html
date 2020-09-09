@@ -1,0 +1,417 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part One: A basic parser · arzg’s blog</title><link rel=stylesheet href=https://arzg.github.io/scss/main.52a8a0100460a1c45e4605c478218ea6b867ab22d3b108e7aa9cc7ec891bac6c.css integrity="sha256-UqigEARgocReRgXEeCGOprhnqyLTsQjnqpzH7IkbrGw="></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><subtitle>Make A Language</subtitle><h1>Part One: A basic parser</h1></header><p>September 8, 2020</p><main><p>The most fundamental part of any language is the parser<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> &ndash; a piece of software whose purpose is to take a flat structure (usually text in some form) and convert it into a tree structure. In this post, we’ll make a parser for mathematical expressions that don’t contain nesting. For example, <code>1 + 1</code> is allowed, but <code>2 * 3 + 4</code> isn’t (because that’s shorthand for <code>(2 * 3) + 4</code>, and thus contains nesting). I’ve chosen to keep it this simple so that we don’t need to worry about order of operations.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p><p>Let’s think about the problem: the only two elements that are allowed in our expressions are numbers and operators. If we can make a parser for numbers and a parser for operators, we’ll be well on our way to finishing the first incarnation of our parser.</p><h1 id=a-parser-for-numbers>A parser for numbers</h1><p>As we’re good test-driven developers, we’ll start by writing a test. First, we open <code>src/lib.rs</code> and are greeted by this:</p><pre><code>#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+</code></pre><p>Let’s remove the <code>it_works</code> test, and change it to a test that checks if we can parse numbers:</p><pre><code>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_number() {
+      assert_eq!(Number::new(&quot;123&quot;), Number(123));
+    }
+}
+</code></pre><p>Let’s follow TDD some more: what’s the shortest thing we can write that makes this pass? Well, first, we need to make it compile.</p><pre><code>#[derive(Debug, PartialEq)]
+pub struct Number(i32);
+
+impl Number {
+    pub fn new(s: &amp;str) -&gt; Self {}
+}
+</code></pre><p>This still doesn’t compile, because <code>new</code> doesn’t return anything. Well, the easiest thing we can do is use the <code>parse</code> method on <code>str</code>:</p><pre><code>impl Number {
+    pub fn new(s: &amp;str) -&gt; Self {
+        Self(s.parse().unwrap())
+    }
+}
+</code></pre><p>Now it compiles! Let’s see if the tests pass:</p><pre><code>$ cargo t
+   Compiling eldiro v0.1.0 (/home/me/src/eldiro)
+    Finished test [unoptimized + debuginfo] target(s) in 0.14s
+     Running /home/me/.cache/cargo-target/debug/deps/eldiro-4b82c3c57a78933f
+
+running 1 test
+test tests::parse_number ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+   Doc-tests eldiro
+
+running 0 tests
+</code></pre><p>Hooray, it works!</p><h1 id=a-parser-for-operators>A parser for operators</h1><p>We’ll start by writing tests for addition, subtraction, multiplication and division:</p><pre><code>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_add_op() {
+        assert_eq!(Op::new(&quot;+&quot;), Op::Add);
+    }
+
+    #[test]
+    fn parse_sub_op() {
+        assert_eq!(Op::new(&quot;-&quot;), Op::Sub);
+    }
+
+    #[test]
+    fn parse_mul_op() {
+        assert_eq!(Op::new(&quot;*&quot;), Op::Mul);
+    }
+
+    #[test]
+    fn parse_div_op() {
+        assert_eq!(Op::new(&quot;/&quot;), Op::Div);
+    }
+}
+</code></pre><p><code>Op</code> is undefined, so let’s declare that:</p><pre><code>#[derive(Debug, PartialEq)]
+pub enum Op {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+</code></pre><p>Now the only remaining compile error is that <code>Op::new</code> doesn’t exist:</p><pre><code>impl Op {
+    pub fn new(s: &amp;str) -&gt; Self {
+        match s {
+            &quot;+&quot; =&gt; Self::Add,
+            &quot;-&quot; =&gt; Self::Sub,
+            &quot;*&quot; =&gt; Self::Mul,
+            &quot;/&quot; =&gt; Self::Div,
+            _ =&gt; panic!(&quot;bad operator&quot;),
+        }
+    }
+}
+</code></pre><p>Instead of handling the case where we’ve been given a non-existent operator, we just crash the program. Obviously this is far from ideal, but we’re keeping it really simple at the moment.</p><pre><code>$ cargo t
+// snip
+running 5 tests
+test tests::parse_add_op ... ok
+test tests::parse_div_op ... ok
+test tests::parse_mul_op ... ok
+test tests::parse_sub_op ... ok
+test tests::parse_number ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+// doc-test stuff that we’re not interested in
+</code></pre><p>Nice! We’ve now got the ingredients we need to parse our ultra-simplified mathematical expressions.</p><h1 id=putting-it-all-together>Putting it all together</h1><p>As usual, we’ll write a test:</p><pre><code>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_one_plus_two() {
+        assert_eq!(
+            Expr::new(&quot;1+2&quot;),
+            Expr {
+                lhs: Number(1),
+                rhs: Number(2),
+                op: Op::Add,
+            },
+        );
+    }
+}
+</code></pre><p>In case you’re not familiar with the jargon, <code>Expr</code> is a common shorthand for <code>Expression</code>, <code>lhs</code> is short for left-hand side, and, shockingly, <code>rhs</code> stands for right-hand side.</p><p><code>Expr</code> will be the type that holds the structure of what an expression actually <em>is</em> in Eldiro. Since we don’t support nesting, <code>Expr</code>’s definition is straightforward:</p><pre><code>#[derive(Debug, PartialEq)]
+pub struct Expr {
+    lhs: Number,
+    rhs: Number,
+    op: Op,
+}
+</code></pre><p>Let’s tentatively define the <code>new</code> method:</p><pre><code>impl Expr {
+    pub fn new(s: &amp;str) -&gt; Self {
+        let lhs = Number::new(s);
+        let rhs = Number::new(s);
+        let op = Op::new(s);
+
+        Self { lhs, rhs, op }
+    }
+}
+</code></pre><p>This won’t work, though, because we’re trying to parse the left-hand side (as well as the right-hand side and the operator) from the <em>entire</em> input, when in reality parsing the left-hand side only needs to look at a small portion at the start of the input. The same goes for the right-hand side and the operator, too. Let’s run the tests to see if we’re correct:</p><pre><code>$ cargo t
+running 6 tests
+test tests::parse_add_op ... ok
+test tests::parse_div_op ... ok
+test tests::parse_number ... ok
+test tests::parse_mul_op ... ok
+test tests::parse_sub_op ... ok
+test tests::parse_one_plus_two ... FAILED
+
+failures:
+
+---- tests::parse_one_plus_two stdout ----
+thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }', src/lib.rs:6:24
+</code></pre><p>And sure enough, the test fails. Hmm …</p><p>So, what we need to do is … extract the numbers at the start of the input? Something like this:</p><pre><code>assert_eq!(extractor_thing(&quot;1+2&quot;), &quot;1&quot;);
+</code></pre><p>Well, if we’ve now got the left-hand side as its own <code>&str</code>, we need some way to get the operator. I mean, if we just scanned past the left-hand side, why don’t we continue from where we left off? To do that, <code>extractor_thing</code> will have to return a pair of the part of the input it extracted, as well as the leftovers:</p><pre><code>//                       extracted portion ╮
+//                          leftover ╮     │
+assert_eq!(extractor_thing(&quot;1+2&quot;), (&quot;+2&quot;, &quot;1&quot;));
+</code></pre><p>Let’s get started on writing this <code>extractor_thing</code> in a new module called <code>utils</code>. Create the file <code>src/utils.rs</code> and add <code>mod utils;</code> to the top of <code>lib.rs</code>.</p><pre><code>// utils.rs
+pub(crate) fn extract_digits(s: &amp;str) -&gt; (&amp;str, &amp;str) {
+    (&amp;s[1..], &amp;s[0..1])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_one_digit() {
+        assert_eq!(extract_digits(&quot;1+2&quot;), (&quot;+2&quot;, &quot;1&quot;));
+    }
+}
+</code></pre><p>Well, the tests <em>pass,</em> but we’re not thinking ahead; what if the number is more than one digit long?</p><pre><code>pub(crate) fn extract_digits(s: &amp;str) -&gt; (&amp;str, &amp;str) {
+    let mut digits_end = 0;
+
+    for (idx, c) in s.char_indices() {
+        if c.is_ascii_digit() {
+            digits_end = idx + 1;
+        } else {
+            break;
+        }
+    }
+
+    let digits = &amp;s[..digits_end];
+    let remainder = &amp;s[digits_end..];
+    (remainder, digits)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_one_digit() {
+        assert_eq!(extract_digits(&quot;1+2&quot;), (&quot;+2&quot;, &quot;1&quot;));
+    }
+
+    #[test]
+    fn extract_multiple_digits() {
+        assert_eq!(extract_digits(&quot;10-20&quot;), (&quot;-20&quot;, &quot;10&quot;));
+    }
+}
+</code></pre><p>This works, but isn’t very idiomatic, with that <code>for</code> loop and <code>mut</code>ation. Let’s rewrite it to use iterator adaptors:</p><pre><code>pub(crate) fn extract_digits(s: &amp;str) -&gt; (&amp;str, &amp;str) {
+    let digits_end = s
+        .char_indices()
+        .find_map(|(idx, c)| if c.is_ascii_digit() { None } else { Some(idx) })
+        .unwrap_or_else(|| s.len());
+
+    let digits = &amp;s[..digits_end];
+    let remainder = &amp;s[digits_end..];
+    (remainder, digits)
+}
+</code></pre><p>What we’re doing here is looking at all the characters (and their respective indices) in <code>s</code> &ndash; if the character is an ASCII digit (i.e. anywhere from <code>0</code> to <code>9</code>) we move onto the next one. However, if the character isn’t an ASCII digit, we stop there and return the index of that character. On the off-chance that we never encounter a non-digit character, the index where the digits end is the length of the input (as the entire input consists of digits). We should probably add some tests to verify that:</p><pre><code>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn do_not_extract_anything_from_empty_input() {
+        assert_eq!(extract_digits(&quot;&quot;), (&quot;&quot;, &quot;&quot;));
+    }
+
+    #[test]
+    fn extract_digits_with_no_remainder() {
+        assert_eq!(extract_digits(&quot;100&quot;), (&quot;&quot;, &quot;100&quot;));
+    }
+}
+</code></pre><p>And, indeed, that does work:</p><pre><code>$ cargo t
+running 9 tests
+test tests::parse_add_op ... ok
+test tests::parse_number ... ok
+test tests::parse_sub_op ... ok
+test tests::parse_div_op ... ok
+test tests::parse_mul_op ... ok
+test utils::tests::do_not_extract_anything_from_empty_input ... ok
+test utils::tests::extract_multiple_digits ... ok
+test utils::tests::extract_one_digit ... ok
+test utils::tests::extract_digits_with_no_remainder ... ok
+test tests::parse_one_plus_two ... FAILED
+</code></pre><p>Huh, what’s that failed test there? Oh, right, we were trying to parse <code>"1+2"</code>.</p><p>Remember this?</p><pre><code>// lib.rs
+impl Expr {
+    pub fn new(s: &amp;str) -&gt; Self {
+        let lhs = Number::new(s);
+        let rhs = Number::new(s);
+        let op = Op::new(s);
+
+        Self { lhs, rhs, op }
+    }
+}
+</code></pre><p>Let’s convert it to use our new <code>extract_digits</code> function:</p><pre><code>impl Expr {
+    pub fn new(s: &amp;str) -&gt; Self {
+        let (s, lhs) = utils::extract_digits(s);
+        let lhs = Number::new(lhs);
+
+        let (s, rhs) = utils::extract_digits(s);
+        let rhs = Number::new(rhs);
+
+        // Uhhh ...
+        let op = Op::new(s);
+
+        Self { lhs, rhs, op }
+    }
+}
+</code></pre><p>This won’t do, this won’t do at all! Not only are we parsing the operator <em>after</em> the right-hand side (even though it should come before), but we also haven’t applied the extraction logic we used for numbers to parsing operators. I guess we should head back to <code>utils.rs</code> and write up another function.</p><pre><code>pub(crate) fn extract_op(s: &amp;str) -&gt; (&amp;str, &amp;str) {
+    match &amp;s[0..1] {
+        &quot;+&quot; | &quot;-&quot; | &quot;*&quot; | &quot;/&quot; =&gt; {}
+        _ =&gt; panic!(&quot;bad operator&quot;),
+    }
+
+    (&amp;s[1..], &amp;s[0..1])
+}
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn extract_plus() {
+        assert_eq!(extract_op(&quot;+2&quot;), (&quot;2&quot;, &quot;+&quot;));
+    }
+
+    #[test]
+    fn extract_minus() {
+        assert_eq!(extract_op(&quot;-10&quot;), (&quot;10&quot;, &quot;-&quot;));
+    }
+
+    #[test]
+    fn extract_star() {
+        assert_eq!(extract_op(&quot;*3&quot;), (&quot;3&quot;, &quot;*&quot;));
+    }
+
+    #[test]
+    fn extract_slash() {
+        assert_eq!(extract_op(&quot;/4&quot;), (&quot;4&quot;, &quot;/&quot;));
+    }
+}
+</code></pre><p>Let’s apply this in <code>Expr::new</code>:</p><pre><code>impl Expr {
+    pub fn new(s: &amp;str) -&gt; Self {
+        let (s, lhs) = utils::extract_digits(s);
+        let lhs = Number::new(lhs);
+
+        let (s, op) = utils::extract_op(s);
+        let op = Op::new(op);
+
+        let (s, rhs) = utils::extract_digits(s);
+        let rhs = Number::new(rhs);
+
+        Self { lhs, rhs, op }
+    }
+}
+</code></pre><p>Every time we extract something from the input, we declare a new binding with the same name as the initial input <code>s</code> so that everything we do with <code>s</code> afterwards doesn’t include the part we ‘consumed’.</p><p>Really, though, shouldn’t <code>Number::new</code> and <code>Op::new</code> handle extracting the relevant text from the input themselves? Let’s update the tests:</p><pre><code>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_number() {
+        assert_eq!(Number::new(&quot;123&quot;), (&quot;&quot;, Number(123)));
+    }
+
+    #[test]
+    fn parse_add_op() {
+        assert_eq!(Op::new(&quot;+&quot;), (&quot;&quot;, Op::Add));
+    }
+
+    #[test]
+    fn parse_sub_op() {
+        assert_eq!(Op::new(&quot;-&quot;), (&quot;&quot;, Op::Sub));
+    }
+
+    #[test]
+    fn parse_mul_op() {
+        assert_eq!(Op::new(&quot;*&quot;), (&quot;&quot;, Op::Mul));
+    }
+
+    #[test]
+    fn parse_div_op() {
+        assert_eq!(Op::new(&quot;/&quot;), (&quot;&quot;, Op::Div));
+    }
+}
+</code></pre><p>Since all our tests completely consume their inputs, there’s never any leftover input. To represent this, we’ve wrapped the expected output of each parser in a tuple where the first item is an empty string literal.</p><p>Let’s update all our parsers to independently extract text from the input:</p><pre><code>impl Number {
+    pub fn new(s: &amp;str) -&gt; (&amp;str, Self) {
+        let (s, number) = utils::extract_digits(s);
+        (s, Self(number.parse().unwrap()))
+    }
+}
+
+// snip
+
+impl Op {
+    pub fn new(s: &amp;str) -&gt; (&amp;str, Self) {
+        let (s, op) = utils::extract_op(s);
+
+        let op = match op {
+            &quot;+&quot; =&gt; Self::Add,
+            &quot;-&quot; =&gt; Self::Sub,
+            &quot;*&quot; =&gt; Self::Mul,
+            &quot;/&quot; =&gt; Self::Div,
+            _ =&gt; unreachable!(),
+        };
+
+        (s, op)
+    }
+}
+
+// snip
+
+impl Expr {
+    pub fn new(s: &amp;str) -&gt; Self {
+        let (s, lhs) = Number::new(s);
+        let (s, op) = Op::new(s);
+        let (s, rhs) = Number::new(s);
+
+        Self { lhs, rhs, op }
+    }
+}
+</code></pre><p>Look at how clean <code>Expr::new</code> is now! But we still have one problem: what if <code>Expr::new</code> doesn’t fully consume its input? Let’s make <code>Expr::new</code> return a <code>(&str, Self)</code> like all the other parsers:</p><pre><code>impl Expr {
+    pub fn new(s: &amp;str) -&gt; (&amp;str, Self) {
+        let (s, lhs) = Number::new(s);
+        let (s, op) = Op::new(s);
+        let (s, rhs) = Number::new(s);
+
+        (s, Self { lhs, rhs, op })
+    }
+}
+
+// snip
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_one_plus_two() {
+        assert_eq!(
+            Expr::new(&quot;1+2&quot;),
+            (
+                &quot;&quot;,
+                Expr {
+                    lhs: Number(1),
+                    rhs: Number(2),
+                    op: Op::Add,
+                },
+            ),
+        );
+    }
+}
+</code></pre><p>Let’s finish off this instalment of <em>Make A Language</em> by basking in the glory of a passing test suite.</p><pre><code>$ cargo t
+   Compiling eldiro v0.1.0 (/home/me/src/eldiro)
+    Finished test [unoptimized + debuginfo] target(s) in 0.46s
+     Running /home/me/.cache/cargo-target/debug/deps/eldiro-4b82c3c57a78933f
+
+running 14 tests
+test tests::parse_add_op ... ok
+test tests::parse_number ... ok
+test tests::parse_div_op ... ok
+test tests::parse_mul_op ... ok
+test utils::tests::extract_minus ... ok
+test utils::tests::extract_multiple_digits ... ok
+test tests::parse_sub_op ... ok
+test utils::tests::extract_one_digit ... ok
+test tests::parse_one_plus_two ... ok
+test utils::tests::extract_digits_with_no_remainder ... ok
+test utils::tests::do_not_extract_anything_from_empty_input ... ok
+test utils::tests::extract_plus ... ok
+test utils::tests::extract_slash ... ok
+test utils::tests::extract_star ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+   Doc-tests eldiro
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><p>Beautiful! Next time, we’ll add support for whitespace.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>For most languages it’s actually the lexer, but we’ll worry about that when we improve the parser in a future post. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>If you <em>really</em> want to learn about operator precedence and how you can handle it in a parser, take a look at <a href=https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>this great article</a>. Yet again, I will only cover this topic once we’ve rewritten the parser. <a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/0/>Part Zero: Getting set up</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/2/>Part Two: Whitespace support</a></div><div style=clear:both></div></nav></body></html>
