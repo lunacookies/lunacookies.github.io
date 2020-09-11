@@ -1,77 +1,77 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Two: Whitespace support · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.88cb009a7887f1884de69fd98aa9b3f6d1846ab75c16a13a176f5393e3da1ae2.css integrity="sha256-iMsAmniH8YhN5p/Ziqmz9tGEardcFqE6F29Tk+PaGuI="></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><subtitle>Make A Language</subtitle><h1>Part Two: Whitespace support</h1></header><p>September 9, 2020</p><main><p>Last time, we made a parser for simple unnested mathematical expressions, such as <code>1+1</code> or <code>3*4</code>. In this post, we’ll add support for whitespace (so that users of Eldiro will be able to use <code>2 + 2</code> instead of <code>2+2</code>).</p><p>We can achieve this by creating an <code>extract_whitespace</code> function similar to <code>extract_digits</code>:</p><pre><code>// utils.rs
-
-// Let’s copy-paste from extract_digits
-pub(crate) fn extract_whitespace(s: &amp;str) -&gt; (&amp;str, &amp;str) {
-    let whitespace_end = s
-        .char_indices()
-        .find_map(|(idx, c)| if c == ' ' { None } else { Some(idx) })
-        .unwrap_or_else(|| s.len());
-
-    let whitespace = &amp;s[..whitespace_end];
-    let remainder = &amp;s[whitespace_end..];
-    (remainder, whitespace)
-}
-
-#[cfg(test)]
-mod tests {
-    // snip
-
-    #[test]
-    fn extract_spaces() {
-        assert_eq!(extract_whitespace(&quot;    1&quot;), (&quot;1&quot;, &quot;    &quot;));
-    }
-}
-</code></pre><p>Although this <em>does</em> indeed work, it involves quite a bit of repetition. What if we want a similar function for, say, extracting variable names? Instead of copy-pasting <code>extract_digits</code> yet again, we can define a <code>take_while</code> function with the following signature:</p><pre><code>fn take_while(accept: impl Fn(char) -&gt; bool, s: &amp;str) -&gt; (&amp;str, &amp;str)
-</code></pre><p><code>take_while</code> takes a function called <code>accept</code> that determines whether to accept a given character or not. Once it encounters a character that is not accepted, it stops consuming characters and returns.</p><pre><code>pub(crate) fn take_while(accept: impl Fn(char) -&gt; bool, s: &amp;str) -&gt; (&amp;str, &amp;str) {
-    let extracted_end = s
-        .char_indices()
-        .find_map(|(idx, c)| if accept(c) { None } else { Some(idx) })
-        .unwrap_or_else(|| s.len());
-
-    let extracted = &amp;s[..extracted_end];
-    let remainder = &amp;s[extracted_end..];
-    (remainder, extracted)
-}
-</code></pre><p>We can now redefine <code>extract_digits</code> and <code>extract_whitespace</code> in terms of <code>take_while</code>:</p><pre><code>pub(crate) fn extract_digits(s: &amp;str) -&gt; (&amp;str, &amp;str) {
-    take_while(|c| c.is_ascii_digit(), s)
-}
-
-pub(crate) fn extract_whitespace(s: &amp;str) -&gt; (&amp;str, &amp;str) {
-    take_while(|c| c == ' ', s)
-}
-</code></pre><p>And our tests still pass!</p><p>To actually allow whitespace inside expressions, we can call <code>extract_whitespace</code> while throwing away the output:</p><pre><code>// lib.rs
-
-impl Expr {
-    pub fn new(s: &amp;str) -&gt; (&amp;str, Self) {
-        let (s, lhs) = Number::new(s);
-        let (s, _) = utils::extract_whitespace(s);
-
-        let (s, op) = Op::new(s);
-        let (s, _) = utils::extract_whitespace(s);
-
-        let (s, rhs) = Number::new(s);
-
-        (s, Self { lhs, rhs, op })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // snip
-
-    #[test]
-    fn parse_expr_with_whitespace() {
-        assert_eq!(
-            Expr::new(&quot;2 * 2&quot;),
-            (
-                &quot;&quot;,
-                Expr {
-                    lhs: Number(2),
-                    rhs: Number(2),
-                    op: Op::Mul,
-                },
-            ),
-        );
-    }
-}
-</code></pre><p>Note that we aren’t using <code>let _ = utils::extract_whitespace(s)</code>, as that would throw away the <code>s</code> that we get back, thereby not progressing through the input. Instead, by using <code>let (s, _) = ...</code> we keep advancing, but throw away the actual whitespace we extracted.</p><p>In the next post, Eldiro will gain the ability to create variables. This involves both parsing, as well as the beginnings of an interpreter.</p></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/1/>Part One: A basic parser</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/3/>Part Three: Defining variables</a></div><div style=clear:both></div></nav></body></html>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Two: Whitespace support · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.af77ed47def9026c4534350f127c6bcb6098dce94453053cc54e4c4fbc3c031e.css integrity="sha256-r3ftR975AmxFNDUPEnxry2CY3OlEUwU8xU5MT7w8Ax4="></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><subtitle>Make A Language</subtitle><h1>Part Two: Whitespace support</h1></header><p>September 9, 2020</p><main><p>Last time, we made a parser for simple unnested mathematical expressions, such as <code>1+1</code> or <code>3*4</code>. In this post, we’ll add support for whitespace (so that users of Eldiro will be able to use <code>2 + 2</code> instead of <code>2+2</code>).</p><p>We can achieve this by creating an <code>extract_whitespace</code> function similar to <code>extract_digits</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=c1>// Let’s copy-paste from extract_digits
+</span><span class=c1></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_whitespace</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>whitespace_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>find_map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>c</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=sc>&#39; &#39;</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>None</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span><span class=w> </span><span class=p>})</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>unwrap_or_else</span><span class=p>(</span><span class=o>||</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>len</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>whitespace</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[..</span><span class=n>whitespace_end</span><span class=p>];</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>whitespace_end</span><span class=p>..];</span><span class=w>
+</span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>whitespace</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>extract_spaces</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_whitespace</span><span class=p>(</span><span class=s>&#34;    1&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;1&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;    &#34;</span><span class=p>));</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Although this <em>does</em> indeed work, it involves quite a bit of repetition. What if we want a similar function for, say, extracting variable names? Instead of copy-pasting <code>extract_digits</code> yet again, we can define a <code>take_while</code> function with the following signature:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w>
+</span></code></pre></div><p><code>take_while</code> takes a function called <code>accept</code> that determines whether to accept a given character or not. Once it encounters a character that is not accepted, it stops consuming characters and returns.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>find_map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>accept</span><span class=p>(</span><span class=n>c</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>None</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span><span class=w> </span><span class=p>})</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>unwrap_or_else</span><span class=p>(</span><span class=o>||</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>len</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[..</span><span class=n>extracted_end</span><span class=p>];</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>extracted_end</span><span class=p>..];</span><span class=w>
+</span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>extracted</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We can now redefine <code>extract_digits</code> and <code>extract_whitespace</code> in terms of <code>take_while</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=p>.</span><span class=n>is_ascii_digit</span><span class=p>(),</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_whitespace</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=sc>&#39; &#39;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>And our tests still pass!</p><p>To actually allow whitespace inside expressions, we can call <code>extract_whitespace</code> while throwing away the output:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>lhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Op</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>})</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_expr_with_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
+</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;2 * 2&#34;</span><span class=p>),</span><span class=w>
+</span><span class=w>            </span><span class=p>(</span><span class=w>
+</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>lhs</span>: <span class=nc>Number</span><span class=p>(</span><span class=mi>2</span><span class=p>),</span><span class=w>
+</span><span class=w>                    </span><span class=n>rhs</span>: <span class=nc>Number</span><span class=p>(</span><span class=mi>2</span><span class=p>),</span><span class=w>
+</span><span class=w>                    </span><span class=n>op</span>: <span class=nc>Op</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note that we aren’t using <code>let _ = utils::extract_whitespace(s)</code>, as that would throw away the <code>s</code> that we get back, thereby not progressing through the input. Instead, by using <code>let (s, _) = ...</code> we keep advancing, but throw away the actual whitespace we extracted.</p><p>In the next post, Eldiro will gain the ability to create variables. This involves both parsing, as well as the beginnings of an interpreter.</p></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/1/>Part One: A basic parser</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/3/>Part Three: Defining variables</a></div><div style=clear:both></div></nav></body></html>
