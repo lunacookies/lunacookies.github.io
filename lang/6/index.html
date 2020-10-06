@@ -763,7 +763,7 @@ error[E0061]: this function takes 1 argument but 0 arguments were supplied
    |                                                       ^^^^- supplied 0 arguments
    |                                                       |
    |                                                       expected 1 argument
-   | 
+   |
   ::: src/expr.rs:73:5
    |
 73 |     pub(crate) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
@@ -1293,4 +1293,4 @@ test result: FAILED. 45 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 running 46 tests
 ..............................................
 test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Thanks for reading! In the next post we’ll create a REPL for Eldiro. This will both allow for some immediate feedback during development, as well as fixing all those warnings about unused functions we’ve been seeing for so long.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>Ruby, for example, also has the idea of a block, that coincidentally is different from the Rust meaning. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>The tests in <code>crate::expr</code> don’t count, because those are only there to test that we’ve integrated <code>Block::eval</code> with <code>Expr::eval</code>. <a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/5/>Part Five: Binding Usages</a></div><div style=clear:both></div></nav></body></html>
+</code></pre><p>Thanks for reading! In the next post we’ll create a REPL for Eldiro. This will both allow for some immediate feedback during development, as well as fixing all those warnings about unused functions we’ve been seeing for so long.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>Ruby, for example, also has the idea of a block, that coincidentally is different from the Rust meaning. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>The tests in <code>crate::expr</code> don’t count, because those are only there to test that we’ve integrated <code>Block::eval</code> with <code>Expr::eval</code>. <a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/5/>Part Five: Binding Usages</a></div><div style=clear:both></div></nav></body></html>
