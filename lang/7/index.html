@@ -1,0 +1,598 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Seven: A REPL · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.6b3dc67eb949bbec3fe7a812a06763ce363ea02b72f6d47f5e75e2c12c3ff408.css integrity="sha256-az3GfrlJu+w/56gSoGdjzjY+oCty9tR/XnXiwSw/9Ag="></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><subtitle>Make A Language</subtitle><h1>Part Seven: A REPL</h1></header><p>7 October 2020</p><main><p>In case you aren’t familiar with the concept, a <em>read-eval-print-loop,</em> or REPL, is a program that lets you interactively use a programming language. Here’s a hypothetical session with an Eldiro REPL:</p><pre><code>$ eldiro
+→ 5
+5
+→ 10 - 7
+3
+→ let one = 1
+→ one
+1
+</code></pre><p>To implement such a thing, the REPL needs to have access to <code>Stmt::new</code>, <code>Val</code> and <code>Env</code> (to store the evaluation environment between inputs). We should isolate the REPL from as many internal implementation details as possible &ndash; as such, it would be nice if the REPL cannot see that Eldiro has <code>Stmt</code>s. Additionally, the REPL should not have to worry about the idea of ‘unconsumed input’ that every parser in Eldiro has.</p><p>Rather, there should simply be a top-level <code>parse</code> function that calls the correct parser (in our case <code>Stmt::new</code>), while also returning an error if the input hasn’t been consumed fully:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;?</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>stmt</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>stmt</span>::<span class=n>Stmt</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=n>stmt</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>What should that <code>?</code> be? Again, we don’t want the REPL to <em>know</em> about <code>Stmt</code>. A solution to this is to create a <code>Parse</code> struct that contains a <code>Stmt</code>, without exposing <code>Stmt</code> itself:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parse</span><span class=p>(</span><span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Parse</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>stmt</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>stmt</span>::<span class=n>Stmt</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Parse</span><span class=p>(</span><span class=n>stmt</span><span class=p>))</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We have a bunch of <code>pub</code>s scattered throughout our codebase. Now that parsing is exposed properly, we can prune the <code>pub</code>s down to those which are actually needed. Search and replace <code>"pub "</code> with <code>""</code> and <code>"pub(crate) "</code> with <code>""</code> across the whole project to get rid of them. We now need to add all the necessary <code>pub(crate)</code> and <code>pub</code>s back again, following the compiler’s instructions. I’ll go through fixing the first error in detail, but I’ll leave you to do the rest yourself.</p><pre><code>$ cargo c
+error[E0603]: struct `Env` is private
+ --&gt; src/binding_def.rs:1:17
+  |
+1 | use crate::env::Env;
+  |                 ^^^ private struct
+  |
+note: the struct `Env` is defined here
+ --&gt; src/env.rs:5:1
+  |
+5 | struct Env&lt;'parent&gt; {
+  | ^^^^^^^^^^^^^^^^^^^
+
+lots more errors ...
+</code></pre><p>Let’s open up <code>env.rs</code> and make <code>Env</code> <code>pub(crate)</code>:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>bindings</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>Val</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>parent</span>: <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;parent</span><span class=w> </span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>This change is very large, so feel free to take a look at the <a href=https://github.com/arzg/eldiro/commit/71a4abacda26c4722ccfd4ee46a889e1cfb6ab70>diff on GitHub</a>.</p><p>Now that the REPL only has access to our <code>parse</code> function and the <code>Parse</code> struct, it needs a way to evaluate parsed Eldiro code. A nice, intuitive interface for this is an <code>eval</code> method on <code>Parse</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>For this to compile, both <code>Env</code> and <code>Val</code> need to be <code>pub</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// env.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>bindings</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>Val</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>parent</span>: <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;parent</span><span class=w> </span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// val.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Val</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=kt>i32</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>Unit</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We should re-export <code>Env</code> and <code>Val</code> from <code>lib.rs</code> to make them easy to access. Here’s <code>lib.rs</code> in its entirety:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>binding_def</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>env</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>stmt</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>utils</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>val</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>val</span>::<span class=n>Val</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parse</span><span class=p>(</span><span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Parse</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>stmt</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>stmt</span>::<span class=n>Stmt</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Parse</span><span class=p>(</span><span class=n>stmt</span><span class=p>))</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Now that the minimum and <em>only</em> the minimum interface for a REPL is public, we can start implementing the REPL itself.</p><p>As Eldiro becomes more developed, we may want to add fancy features like autocomplete and syntax highlighting to the REPL. Although we could write the code necessary to make use of terminal emulators’ advanced features ourselves, a more reasonable approach is to use libraries that already exist. Say that we create the REPL as part of the Eldiro crate (we would put the code in <code>src/bin/eldiro.rs</code>) and used a terminal colours library. If we ever write, say, a <a href=https://langserver.org>language server</a> for Eldiro that depends on the <code>eldiro</code> crate, that terminal colours library would be pulled in, regardless of whether we actually want it or not. Because of this, it makes more sense to put the REPL into a separate crate. We could put the REPL into its own repository too, but that seems like overkill given the size of the project.</p><p>To keep the <code>eldiro</code> crate and the REPL in the same folder, while keeping them separate crates, we need to use <a href=https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html>Cargo’s Workspaces</a>. Let’s move all of the current <code>eldiro</code> crate into its own folder, first:</p><pre><code>$ mkdir -p crates/eldiro
+$ git mv {Cargo.toml,src} crates/eldiro/ # Or use ‘mv’ if you aren’t using Git.
+</code></pre><p>We need to instruct Cargo that all the crates in our workspace will reside inside the <code>crates/</code> directory. To do this, let’s create a <code>Cargo.toml</code> at the root of the repository and fill it with the following:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>workspace</span><span class=p>]</span>
+<span class=nx>members</span> <span class=p>=</span> <span class=p>[</span><span class=s2>&#34;crates/*&#34;</span><span class=p>]</span>
+</code></pre></div><p>Let’s create a crate for the REPL, now:</p><pre><code>$ cargo new crates/eldiro-repl
+</code></pre><p>Hey, hey, wait a second! Later, we’ll want Eldiro to have an interpreter. Wouldn’t it be nice if the binary used to run the REPL functioned also as an interpreter? Something like this would be cool:</p><pre><code>$ eldiro
+→ 1000
+1000
+→ ^D
+$ cat code.eldiro
+A bunch of Eldiro code ...
+$ eldiro &lt; code.eldiro # Or alternatively ‘cat code.eldiro | eldiro’
+Output of the code
+</code></pre><p>Since the <code>eldiro</code> CLI tool will contain both an interpreter and a REPL, it makes more sense to call the crate <code>eldiro-cli</code>:</p><pre><code>$ rm -r crates/eldiro-repl
+$ cargo new crates/eldiro-cli
+</code></pre><p>Open up <code>crates/eldiro-cli/Cargo.toml</code>, and add the <code>eldiro</code> library as a dependency:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>eldiro</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../eldiro&#34;</span><span class=p>}</span>
+</code></pre></div><p>Let’s start by creating a loop of reading user input:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro-cli/src/main.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>().</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>If you run it, you’ll get something like this:</p><pre><code>$ cargo r -q
+hello
+[crates/eldiro-cli/src/main.rs:8] input = &quot;hello\n&quot;
+goodbye
+[crates/eldiro-cli/src/main.rs:8] input = &quot;goodbye\n&quot;
+^C
+$
+</code></pre><p>Let’s add a prompt to make the user aware that the REPL is waiting for input:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>print</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;→ &#34;</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>().</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+test
+[crates/eldiro-cli/src/main.rs:10] input = &quot;test\n&quot;
+^C
+$
+</code></pre><p>Why didn’t our prompt appear? The reason is that <code>STDOUT</code> and <code>STDIN</code> are <em>line-buffered,</em> meaning that output (or input in the case of <code>STDIN</code>) only appears once a whole line has been sent. We can manually flush <code>STDOUT</code> to fix this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>print</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;→ &#34;</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>().</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>().</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ foo
+[crates/eldiro-cli/src/main.rs:11] input = &quot;foo\n&quot;
+→ bar
+[crates/eldiro-cli/src/main.rs:11] input = &quot;bar\n&quot;
+→ baz
+[crates/eldiro-cli/src/main.rs:11] input = &quot;baz\n&quot;
+→ ^C
+$
+</code></pre><p>Cool! There is one functional problem with this code, though: if printing the prompt fails, <a href=https://github.com/BurntSushi/advent-of-code/issues/17#issuecomment-475443686>the program will panic</a>. In this case, panicking isn’t the right course of action in my opinion &ndash; if writing to <code>STDOUT</code> fails, we should instead handle the error and exit cleanly:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>io</span>::<span class=n>stdout</span><span class=p>(),</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>().</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>().</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We’re getting a handle to <code>STDOUT</code> and <code>STDIN</code> every time we go around the loop. Instead, we could do this once before the loop starts, which is probably faster:<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Finally, we’re allocating a new <code>String</code> on the heap every time a line of input is read from the user. Rather than doing that, we can instead create the <code>String</code> once and read into it each time the loop body runs:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ test
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;test\n&quot;
+→ again
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;test\nagain\n&quot;
+→ wait, what?
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;test\nagain\nwait, what?\n&quot;
+→ ^C
+$
+</code></pre><p>The problem here is that <code>.read_line</code> is <em>appending</em> to <code>input</code>, rather than overwriting what’s there. We need to manually call <code>.clear()</code> on <code>input</code> so that it is emptied before we read input into it again:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ foo
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;foo\n&quot;
+→ bar
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;bar\n&quot;
+→ baz
+[crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;baz\n&quot;
+→ ^C
+$
+</code></pre><p>This way we reuse the previous allocation instead of repeatedly creating new <code>String</code>s.</p><p>To be honest, this is all premature optimisation, and makes little to no difference in practice. However, the code now is less repetitive and … well … I guess it’s fun to optimise things :)</p><h1 id=parsing-input>Parsing input</h1><p>Let’s parse the input the user has provided us with, rather than debug-printing it:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=n>parse</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>parse</span><span class=p>);</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+error[E0277]: `eldiro::Parse` doesn't implement `std::fmt::Debug`
+  --&gt; crates/eldiro-cli/src/main.rs:18:17
+   |
+18 |                 dbg!(parse);
+   |                 ^^^^^^^^^^^^ `eldiro::Parse` cannot be formatted using `{:?}` because it doesn't implement `std::fmt::Debug`
+   |
+   = help: the trait `std::fmt::Debug` is not implemented for `eldiro::Parse`
+   = note: required because of the requirements on the impl of `std::fmt::Debug` for `&amp;eldiro::Parse`
+   = note: required by `std::fmt::Debug::fmt`
+   = note: this error originates in a macro (in Nightly builds, run with -Z macro-backtrace for more info)
+</code></pre><p>Ah, <code>eldiro::Parse</code> doesn’t implement <code>Debug</code>. Let’s derive that now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parse</span><span class=p>(</span><span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>);</span><span class=w>
+</span></code></pre></div><p>And try running again:</p><pre><code>$ cargo r -q
+→ 1 + 1
+Parse error: input was not consumed fully by parser
+→ 9999
+Parse error: input was not consumed fully by parser
+→ ^C
+$
+</code></pre><p>Huh? Let’s add a debug print to see what wasn’t consumed by the parser:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Parse</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>stmt</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>stmt</span>::<span class=n>Stmt</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Parse</span><span class=p>(</span><span class=n>stmt</span><span class=p>))</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w> </span><span class=c1>// here
+</span><span class=c1></span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ 1 + 1
+[crates/eldiro/src/lib.rs:26] s = &quot;\n&quot;
+Parse error: input was not consumed fully by parser
+→ ^C
+$
+</code></pre><p>Ah, of course! <code>.read_line</code> leaves in the final newline from us hitting the return key, so we should strip that off before we parse the input:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>//                   Here ↓
+</span><span class=c1></span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>.</span><span class=n>trim</span><span class=p>())</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=n>parse</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>parse</span><span class=p>);</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ 1 + 1
+[crates/eldiro-cli/src/main.rs:18] parse = Parse(
+    Expr(
+        Operation {
+            lhs: Number(
+                1,
+            ),
+            rhs: Number(
+                1,
+            ),
+            op: Add,
+        },
+    ),
+)
+→ 999
+[crates/eldiro-cli/src/main.rs:18] parse = Parse(
+    Expr(
+        Number(
+            Number(
+                999,
+            ),
+        ),
+    ),
+)
+→ abc
+[crates/eldiro-cli/src/main.rs:18] parse = Parse(
+    Expr(
+        BindingUsage(
+            BindingUsage {
+                name: &quot;abc&quot;,
+            },
+        ),
+    ),
+)
+</code></pre><p>Fantastic! It always feels so good to have different parts of a project come together.</p><p>Don’t forget to get rid of the debug-print we added to <code>parse</code>, by the way.</p><h1 id=evaluating-the-parse>Evaluating the <code>Parse</code></h1><p>Now that we’ve parsed the input handed to us by the user, we can evaluate it:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>.</span><span class=n>trim</span><span class=p>())</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=n>parse</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=nb>Ok</span><span class=p>(</span><span class=n>val</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>val</span><span class=p>);</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;Evaluation error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                    </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>            </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ abc
+Evaluation error: binding with name ‘abc’ does not exist
+→ let abc = 10
+[crates/eldiro-cli/src/main.rs:20] val = Unit
+→ abc
+[crates/eldiro-cli/src/main.rs:20] val = Number(
+    10,
+)
+→ 10 - 5
+[crates/eldiro-cli/src/main.rs:20] val = Number(
+    5,
+)
+→ ^C
+$
+</code></pre><p>Isn’t that cool?!</p><p>The code could use some cleaning, though. In particular, the nested repetition of writing errors to <code>STDERR</code> is a problem solved by the <code>?</code> operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>run</span><span class=p>(</span><span class=n>input</span><span class=p>.</span><span class=n>trim</span><span class=p>(),</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(())</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>run</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>evaluated</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Evaluation error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>evaluated</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>That, in my opinion, is much easier to read.</p><h1 id=quality-of-life-improvements>Quality of life improvements</h1><p>Currently, evaluating a binding definition returns a <code>Unit</code>. This is perfectly reasonable. However, it is a little distracting, in my opinion, when we are constantly reminded of that fact by the REPL:</p><pre><code>$ cargo r -q
+→ let a = 10 * 5
+[crates/eldiro-cli/src/main.rs:36] evaluated = Unit
+→ let b = a
+[crates/eldiro-cli/src/main.rs:36] evaluated = Unit
+→ let c = b
+[crates/eldiro-cli/src/main.rs:36] evaluated = Unit
+→ c
+[crates/eldiro-cli/src/main.rs:36] evaluated = Number(
+    50,
+)
+→ ^C
+$
+</code></pre><p>Let’s add a check to only show the evaluated value if it isn’t a <code>Unit</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>run</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>evaluated</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Evaluation error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>evaluated</span><span class=w> </span><span class=o>!=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Val</span>::<span class=n>Unit</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>evaluated</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code>$ cargo r -q
+→ let a = 10 * 5
+→ let b = a
+→ let c = b
+→ c
+[crates/eldiro-cli/src/main.rs:37] evaluated = Number(
+    50,
+)
+→ ^C
+$
+</code></pre><p>Nice, that’s less noisy. We should also define a proper format for displaying <code>Val</code>s so we can customise how they appear:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/val.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>fmt</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Val</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>fmt</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>f</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Formatter</span><span class=o>&lt;</span><span class=na>&#39;_</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>fmt</span>::<span class=nb>Result</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=bp>self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Number</span><span class=p>(</span><span class=n>n</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>f</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>n</span><span class=p>),</span><span class=w>
+</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Unit</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>f</span><span class=p>,</span><span class=w> </span><span class=s>&#34;Unit&#34;</span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s make use of this in the REPL:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>run</span><span class=p>(</span><span class=n>input</span><span class=p>.</span><span class=n>trim</span><span class=p>(),</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>val</span><span class=p>))</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>val</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>None</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>                </span><span class=n>stderr</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>run</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=nb>Option</span><span class=o>&lt;</span><span class=n>eldiro</span>::<span class=n>Val</span><span class=o>&gt;</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Parse error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>evaluated</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>.</span><span class=n>map_err</span><span class=p>(</span><span class=o>|</span><span class=n>msg</span><span class=o>|</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Evaluation error: {}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>))</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>evaluated</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Val</span>::<span class=n>Unit</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>None</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>evaluated</span><span class=p>))</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s see if it works:</p><pre><code>$ cargo r -q
+→ let calculation = 10 * 10
+→ calculation
+100
+→ ^C
+$
+</code></pre><p>Nice, now we don’t have all that extraneous text cluttering the output.</p><p>To finish up, let’s remove those unneeded<sup id=fnref:3><a href=#fn:3 class=footnote-ref role=doc-noteref>3</a></sup> braces from the <code>match</code> in <code>main</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stderr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stderr</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>run</span><span class=p>(</span><span class=n>input</span><span class=p>.</span><span class=n>trim</span><span class=p>(),</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>val</span><span class=p>))</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>val</span><span class=p>)</span><span class=o>?</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>None</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
+</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=n>msg</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>writeln</span><span class=o>!</span><span class=p>(</span><span class=n>stderr</span><span class=p>,</span><span class=w> </span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>msg</span><span class=p>)</span><span class=o>?</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>In Part Eight we’ll parse and evaluate function definitions.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>I know I said earlier that <code>Env</code> would need to be public, but we can do that later. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>Looking at <a href=https://doc.rust-lang.org/stable/src/std/io/stdio.rs.html#583-601>the code</a> of <code>std::io::stdout()</code>, I can see the construction of an <code>Arc</code> and a <code>RefCell</code> (among other things), the cost of which is avoided (apart from the initial call before the loop). I haven’t run any benchmarks though, and the difference in performance is likely negligible. <a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:3 role=doc-endnote><p>The <code>.flush()</code> on <code>stderr</code> was unneeded, so it was removed here too. When I realised that, I almost went back to the previous code samples and changed it, but then I noticed that the debug line numbers would be mismatched. I decided to just leave it and change it at the end :) <a href=#fnref:3 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/6/>Part Six: Blocks</a></div><div style=clear:both></div></nav></body></html>
