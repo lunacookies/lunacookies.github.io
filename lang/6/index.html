@@ -1,4 +1,4 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Six: Blocks · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.7cfa553208e4e82e2fc9d5bf811b5e0cc2dce25d6805a2fcfc0efbe6934fdab4.css integrity="sha256-fPpVMgjk6C4vydW/gRteDMLc4l1oBaL8/A775pNP2rQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Six: Blocks</h1><subtitle><ul><li>Posted in
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Six: Blocks · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.a54facd29d28d59b7831fe13dd1bba216be79d56fa842078686bbb4859f2f893.css integrity="sha256-pU+s0p0o1Zt4Mf4T3Ru6IWvnnVb6hCB4aGu7SFny+JM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Six: Blocks</h1><subtitle><ul><li>Posted in
 <a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>6 October 2020</li></ul></subtitle></header><main><p>By the end of this post, Eldiro will have <a href=https://doc.rust-lang.org/reference/expressions/block-expr.html>blocks</a>. By <em>block,</em> I mean the Rust meaning, not one from any other programming language.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><h1 id=what-is-a-block-anyway>What is a block, anyway?</h1><p>In Rust (and Eldiro, once they are implemented), blocks are a way to group a bunch of bindings together and ensure that they are not accessible from outside the block. For example, <code>foo</code> and <code>bar</code> aren’t accessible outside the curly braces.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>foo</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>100</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>bar</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=s>&#34;hello&#34;</span><span class=p>;</span><span class=w>
@@ -112,7 +112,7 @@
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>()</span><span class=w> </span><span class=p>}))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 30 tests
 ..............................
 test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -134,7 +134,7 @@ test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>()</span><span class=w> </span><span class=p>}))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 31 tests
 ...............................
 test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -175,7 +175,7 @@ test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span><span class=w> </span><span class=p>}))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It works:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>It works:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 32 tests
 ................................
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -222,7 +222,7 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><h1 id=making-bindingusage-and-block-expressions>Making <code>BindingUsage</code> and <code>Block</code> expressions</h1><p>Let’s re-organise <code>binding_usage</code> and <code>block</code> to be inside of the <code>expr</code> module &ndash; after all, binding usages and blocks are expressions.</p><pre><code>$ mkdir src/expr/
+</span></code></pre></div><h1 id=making-bindingusage-and-block-expressions>Making <code>BindingUsage</code> and <code>Block</code> expressions</h1><p>Let’s re-organise <code>binding_usage</code> and <code>block</code> to be inside of the <code>expr</code> module &ndash; after all, binding usages and blocks are expressions.</p><pre><code class=language-- data-lang=->$ mkdir src/expr/
 $ mv src/binding_usage.rs src/expr/
 $ mv src/block.rs src/expr/
 </code></pre><p>Then move <code>pub mod binding_usage;</code> and <code>pub mod block;</code> from <code>lib.rs</code> into <code>expr.rs</code>. To keep things nice and tidy, let’s change the imports in <code>crate::expr::block::tests</code> to be like this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
@@ -406,7 +406,7 @@ $ mv src/block.rs src/expr/
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s see if it works:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>Let’s see if it works:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 35 tests
 ...........F.......................
 failures:
@@ -496,7 +496,7 @@ test result: FAILED. 34 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s run our tests and see how we went:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>Let’s run our tests and see how we went:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 36 tests
 ......F....F........................
 failures:
@@ -532,7 +532,7 @@ test result: FAILED. 34 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Run the tests!</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>Run the tests!</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 36 tests
 .........F..........................
 failures:
@@ -570,7 +570,7 @@ test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span><span class=w> </span><span class=p>}))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>I wonder what we’ll see …</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>I wonder what we’ll see …</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 36 tests
 ...................F................
 failures:
@@ -622,7 +622,7 @@ test result: FAILED. 35 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span><span class=w> </span><span class=p>}))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 36 tests
 ....................................
 test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -755,7 +755,7 @@ test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The change to <code>Expr::eval</code>’s signature has caused some other errors, too:</p><pre><code>$ cargo c
+</span></code></pre></div><p>The change to <code>Expr::eval</code>’s signature has caused some other errors, too:</p><pre><code class=language-- data-lang=->$ cargo c
     Checking eldiro v0.1.0 (/home/me/src/eldiro)
 error[E0061]: this function takes 1 argument but 0 arguments were supplied
   --&gt; src/binding_def.rs:34:55
@@ -764,7 +764,7 @@ error[E0061]: this function takes 1 argument but 0 arguments were supplied
    |                                                       ^^^^- supplied 0 arguments
    |                                                       |
    |                                                       expected 1 argument
-   | 
+   |
   ::: src/expr.rs:73:5
    |
 73 |     pub(crate) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
@@ -788,7 +788,7 @@ error: aborting due to 2 previous errors
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Eldiro compiles now, so let’s run the tests:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>Eldiro compiles now, so let’s run the tests:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 37 tests
 ..............F......................
 failures:
@@ -826,7 +826,7 @@ test result: FAILED. 36 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>I wonder if it all works …</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>I wonder if it all works …</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 37 tests
 .....................................
 test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -918,7 +918,7 @@ pub enum Val {
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Val</span>::<span class=n>Unit</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This does make <em>this one specific test</em> pass, but the test we wrote earlier with the block containing the number <code>10</code> is failing:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>This does make <em>this one specific test</em> pass, but the test we wrote earlier with the block containing the number <code>10</code> is failing:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 39 tests
 ..................F....................
 failures:
@@ -949,7 +949,7 @@ test result: FAILED. 38 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This fails in the same way that <code>crate::expr::tests::eval_block</code> does:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>This fails in the same way that <code>crate::expr::tests::eval_block</code> does:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 40 tests
 ......F.....F...........................
 failures:
@@ -981,7 +981,7 @@ test result: FAILED. 38 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>})</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 40 tests
 ........................................
 test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -1040,7 +1040,7 @@ test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We check first if the block is empty; if it is, we return early with <code>Val::Unit</code>; otherwise, we go on to loop through all the statements in the block but the last, and evaluate them. The last statement is treated specially, because its value is the value of the entire block. This does all indeed work correctly:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>We check first if the block is empty; if it is, we return early with <code>Val::Unit</code>; otherwise, we go on to loop through all the statements in the block but the last, and evaluate them. The last statement is treated specially, because its value is the value of the entire block. This does all indeed work correctly:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 41 tests
 .........................................
 test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -1109,7 +1109,7 @@ test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=c1></span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>stmts</span><span class=p>.</span><span class=n>last</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s run the tests to see if we’ve broken anything:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>Let’s run the tests to see if we’ve broken anything:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 43 tests
 ...........................................
 test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -1164,7 +1164,7 @@ test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It turns out that both of these tests pass with the current implementation, which is convenient:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>It turns out that both of these tests pass with the current implementation, which is convenient:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 45 tests
 .............................................
 test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -1203,7 +1203,7 @@ let bar = {
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We haven’t accounted for accessing bindings from the parent <code>Env</code> in the current <code>Block::eval</code> implementation, so the test fails:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>We haven’t accounted for accessing bindings from the parent <code>Env</code> in the current <code>Block::eval</code> implementation, so the test fails:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 46 tests
 ..........F...................................
 failures:
@@ -1290,7 +1290,7 @@ test result: FAILED. 45 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=c1></span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>stmts</span><span class=p>.</span><span class=n>last</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>As usual, we’ll finish off this post by running the tests:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>As usual, we’ll finish off this post by running the tests:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 46 tests
 ..............................................
 test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

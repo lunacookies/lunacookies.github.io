@@ -1,4 +1,4 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Nine: Function Calls · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.7cfa553208e4e82e2fc9d5bf811b5e0cc2dce25d6805a2fcfc0efbe6934fdab4.css integrity="sha256-fPpVMgjk6C4vydW/gRteDMLc4l1oBaL8/A775pNP2rQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Nine: Function Calls</h1><subtitle><ul><li>Posted in
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Nine: Function Calls · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.a54facd29d28d59b7831fe13dd1bba216be79d56fa842078686bbb4859f2f893.css integrity="sha256-pU+s0p0o1Zt4Mf4T3Ru6IWvnnVb6hCB4aGu7SFny+JM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Nine: Function Calls</h1><subtitle><ul><li>Posted in
 <a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>8 November 2020</li></ul></subtitle></header><main><p>As we did last time, we need to choose a syntax, this time for function calls.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// Rust syntax
 </span><span class=c1></span><span class=n>f</span><span class=p>(</span><span class=n>a</span><span class=p>,</span><span class=w> </span><span class=n>b</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>);</span><span class=w>
 </span><span class=w></span><span class=n>no_params</span><span class=p>();</span><span class=w>
@@ -53,19 +53,7 @@ no_params
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
-warning: associated function is never used: `get_func`
-  --&gt; crates/eldiro/src/env.rs:33:19
-   |
-33 |     pub(crate) fn get_func(&amp;self, name: &amp;str) -&gt; Result&lt;(Vec&lt;String&gt;, Stmt), String&gt; {
-   |                   ^^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` on by default
-
-warning: associated function is never used: `into_func`
-
-~/Documents/Drive/Code/eldiro
-λ c t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 warning: associated function is never used: `get_func`
   --&gt; crates/eldiro/src/env.rs:33:19
    |
@@ -195,7 +183,7 @@ test result: FAILED. 52 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 warning: associated function is never used: `get_func`
   --&gt; crates/eldiro/src/env.rs:33:19
    |
@@ -311,7 +299,7 @@ test result: FAILED. 48 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 54 tests
 .......................F.....F........................
 failures:
@@ -349,7 +337,7 @@ test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 54 tests
 .......................F............F.................
 failures:
@@ -432,7 +420,7 @@ test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 54 tests
 ........................F.............................
 failures:
@@ -606,7 +594,7 @@ b
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>extracted_end</span><span class=p>..];</span><span class=w>
 </span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>extracted</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 54 tests
 ......................................................
 test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -679,7 +667,7 @@ test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>body</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 55 tests
 .......................................................
 test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -715,7 +703,7 @@ test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 56 tests
 ........................................................
 test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -843,7 +831,7 @@ test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>body</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 59 tests
 ...........................................................
 test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -866,7 +854,7 @@ test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>})</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What this is doing is first trying to obtain the binding usage just as we would do normally; however, if it cannot be found, the error message is saved, and, if the environment contains a function with the same name as the binding usage, the corresponding function call is constructed and evaluated. If this function doesn’t exist, then the error message from the binding usage is used. This prevents using a non-existent binding and getting an error message about a non-existent function instead.</p><p>Let’s run our test suite to see if we’ve broken anything in the process:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>What this is doing is first trying to obtain the binding usage just as we would do normally; however, if it cannot be found, the error message is saved, and, if the environment contains a function with the same name as the binding usage, the corresponding function call is constructed and evaluated. If this function doesn’t exist, then the error message from the binding usage is used. This prevents using a non-existent binding and getting an error message about a non-existent function instead.</p><p>Let’s run our test suite to see if we’ve broken anything in the process:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 59 tests
 ...........................................................
 test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

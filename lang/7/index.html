@@ -1,5 +1,5 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Seven: A REPL · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.7cfa553208e4e82e2fc9d5bf811b5e0cc2dce25d6805a2fcfc0efbe6934fdab4.css integrity="sha256-fPpVMgjk6C4vydW/gRteDMLc4l1oBaL8/A775pNP2rQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Seven: A REPL</h1><subtitle><ul><li>Posted in
-<a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>7 October 2020</li></ul></subtitle></header><main><p>In case you aren’t familiar with the concept, a <em>read-eval-print-loop,</em> or REPL, is a program that lets you interactively use a programming language. Here’s a hypothetical session with an Eldiro REPL:</p><pre><code>$ eldiro
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Seven: A REPL · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.a54facd29d28d59b7831fe13dd1bba216be79d56fa842078686bbb4859f2f893.css integrity="sha256-pU+s0p0o1Zt4Mf4T3Ru6IWvnnVb6hCB4aGu7SFny+JM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Seven: A REPL</h1><subtitle><ul><li>Posted in
+<a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>7 October 2020</li></ul></subtitle></header><main><p>In case you aren’t familiar with the concept, a <em>read-eval-print-loop,</em> or REPL, is a program that lets you interactively use a programming language. Here’s a hypothetical session with an Eldiro REPL:</p><pre><code class=language-- data-lang=->$ eldiro
 → 5
 5
 → 10 - 7
@@ -29,7 +29,7 @@
 </span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have a bunch of <code>pub</code>s scattered throughout our codebase. Now that parsing is exposed properly, we can prune the <code>pub</code>s down to those which are actually needed. Search and replace <code>"pub "</code> with <code>""</code> and <code>"pub(crate) "</code> with <code>""</code> across the whole project to get rid of them. We now need to add all the necessary <code>pub(crate)</code> and <code>pub</code>s back again, following the compiler’s instructions. I’ll go through fixing the first error in detail, but I’ll leave you to do the rest yourself.</p><pre><code>$ cargo c
+</span></code></pre></div><p>We have a bunch of <code>pub</code>s scattered throughout our codebase. Now that parsing is exposed properly, we can prune the <code>pub</code>s down to those which are actually needed. Search and replace <code>"pub "</code> with <code>""</code> and <code>"pub(crate) "</code> with <code>""</code> across the whole project to get rid of them. We now need to add all the necessary <code>pub(crate)</code> and <code>pub</code>s back again, following the compiler’s instructions. I’ll go through fixing the first error in detail, but I’ll leave you to do the rest yourself.</p><pre><code class=language-- data-lang=->$ cargo c
 error[E0603]: struct `Env` is private
  --&gt; src/binding_def.rs:1:17
   |
@@ -96,12 +96,12 @@ lots more errors ...
 </span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that the minimum and <em>only</em> the minimum interface for a REPL is public, we can start implementing the REPL itself.</p><p>As Eldiro becomes more developed, we may want to add fancy features like autocomplete and syntax highlighting to the REPL. Although we could write the code necessary to make use of terminal emulators’ advanced features ourselves, a more reasonable approach is to use libraries that already exist. Say that we create the REPL as part of the Eldiro crate (we would put the code in <code>src/bin/eldiro.rs</code>) and used a terminal colours library. If we ever write, say, a <a href=https://langserver.org>language server</a> for Eldiro that depends on the <code>eldiro</code> crate, that terminal colours library would be pulled in, regardless of whether we actually want it or not. Because of this, it makes more sense to put the REPL into a separate crate. We could put the REPL into its own repository too, but that seems like overkill given the size of the project.</p><p>To keep the <code>eldiro</code> crate and the REPL in the same folder, while keeping them separate crates, we need to use <a href=https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html>Cargo’s Workspaces</a>. Let’s move all of the current <code>eldiro</code> crate into its own folder, first:</p><pre><code>$ mkdir -p crates/eldiro
+</span></code></pre></div><p>Now that the minimum and <em>only</em> the minimum interface for a REPL is public, we can start implementing the REPL itself.</p><p>As Eldiro becomes more developed, we may want to add fancy features like autocomplete and syntax highlighting to the REPL. Although we could write the code necessary to make use of terminal emulators’ advanced features ourselves, a more reasonable approach is to use libraries that already exist. Say that we create the REPL as part of the Eldiro crate (we would put the code in <code>src/bin/eldiro.rs</code>) and used a terminal colours library. If we ever write, say, a <a href=https://langserver.org>language server</a> for Eldiro that depends on the <code>eldiro</code> crate, that terminal colours library would be pulled in, regardless of whether we actually want it or not. Because of this, it makes more sense to put the REPL into a separate crate. We could put the REPL into its own repository too, but that seems like overkill given the size of the project.</p><p>To keep the <code>eldiro</code> crate and the REPL in the same folder, while keeping them separate crates, we need to use <a href=https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html>Cargo’s Workspaces</a>. Let’s move all of the current <code>eldiro</code> crate into its own folder, first:</p><pre><code class=language-- data-lang=->$ mkdir -p crates/eldiro
 $ git mv {Cargo.toml,src} crates/eldiro/ # Or use ‘mv’ if you aren’t using Git.
 </code></pre><p>We need to instruct Cargo that all the crates in our workspace will reside inside the <code>crates/</code> directory. To do this, let’s create a <code>Cargo.toml</code> at the root of the repository and fill it with the following:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>workspace</span><span class=p>]</span>
 <span class=nx>members</span> <span class=p>=</span> <span class=p>[</span><span class=s2>&#34;crates/*&#34;</span><span class=p>]</span>
-</code></pre></div><p>Let’s create a crate for the REPL, now:</p><pre><code>$ cargo new crates/eldiro-repl
-</code></pre><p>Hey, hey, wait a second! Later, we’ll want Eldiro to have an interpreter. Wouldn’t it be nice if the binary used to run the REPL functioned also as an interpreter? Something like this would be cool:</p><pre><code>$ eldiro
+</code></pre></div><p>Let’s create a crate for the REPL, now:</p><pre><code class=language-- data-lang=->$ cargo new crates/eldiro-repl
+</code></pre><p>Hey, hey, wait a second! Later, we’ll want Eldiro to have an interpreter. Wouldn’t it be nice if the binary used to run the REPL functioned also as an interpreter? Something like this would be cool:</p><pre><code class=language-- data-lang=->$ eldiro
 → 1000
 1000
 → ^D
@@ -109,7 +109,7 @@ $ cat code.eldiro
 A bunch of Eldiro code ...
 $ eldiro &lt; code.eldiro # Or alternatively ‘cat code.eldiro | eldiro’
 Output of the code
-</code></pre><p>Since the <code>eldiro</code> CLI tool will contain both an interpreter and a REPL, it makes more sense to call the crate <code>eldiro-cli</code>:</p><pre><code>$ rm -r crates/eldiro-repl
+</code></pre><p>Since the <code>eldiro</code> CLI tool will contain both an interpreter and a REPL, it makes more sense to call the crate <code>eldiro-cli</code>:</p><pre><code class=language-- data-lang=->$ rm -r crates/eldiro-repl
 $ cargo new crates/eldiro-cli
 </code></pre><p>Open up <code>crates/eldiro-cli/Cargo.toml</code>, and add the <code>eldiro</code> library as a dependency:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
 <span class=nx>eldiro</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../eldiro&#34;</span><span class=p>}</span>
@@ -125,7 +125,7 @@ $ cargo new crates/eldiro-cli
 </span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>If you run it, you’ll get something like this:</p><pre><code>$ cargo r -q
+</span></code></pre></div><p>If you run it, you’ll get something like this:</p><pre><code class=language-- data-lang=->$ cargo r -q
 hello
 [crates/eldiro-cli/src/main.rs:8] input = &quot;hello\n&quot;
 goodbye
@@ -144,7 +144,7 @@ $
 </span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 test
 [crates/eldiro-cli/src/main.rs:10] input = &quot;test\n&quot;
 ^C
@@ -162,7 +162,7 @@ $
 </span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → foo
 [crates/eldiro-cli/src/main.rs:11] input = &quot;foo\n&quot;
 → bar
@@ -216,7 +216,7 @@ $
 </span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → test
 [crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;test\n&quot;
 → again
@@ -243,7 +243,7 @@ $
 </span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → foo
 [crates/eldiro-cli/src/main.rs:14] &amp;input = &quot;foo\n&quot;
 → bar
@@ -280,7 +280,7 @@ $
 </span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 error[E0277]: `eldiro::Parse` doesn't implement `std::fmt::Debug`
   --&gt; crates/eldiro-cli/src/main.rs:18:17
    |
@@ -295,7 +295,7 @@ error[E0277]: `eldiro::Parse` doesn't implement `std::fmt::Debug`
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parse</span><span class=p>(</span><span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>);</span><span class=w>
-</span></code></pre></div><p>And try running again:</p><pre><code>$ cargo r -q
+</span></code></pre></div><p>And try running again:</p><pre><code class=language-- data-lang=->$ cargo r -q
 → 1 + 1
 Parse error: input was not consumed fully by parser
 → 9999
@@ -314,7 +314,7 @@ $
 </span><span class=c1></span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;input was not consumed fully by parser&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → 1 + 1
 [crates/eldiro/src/lib.rs:26] s = &quot;\n&quot;
 Parse error: input was not consumed fully by parser
@@ -349,7 +349,7 @@ $
 </span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → 1 + 1
 [crates/eldiro-cli/src/main.rs:18] parse = Parse(
     Expr(
@@ -419,7 +419,7 @@ $
 </span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → abc
 Evaluation error: binding with name ‘abc’ does not exist
 → let abc = 10
@@ -473,7 +473,7 @@ $
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>That, in my opinion, is much easier to read.</p><h1 id=quality-of-life-improvements>Quality of life improvements</h1><p>Currently, evaluating a binding definition returns a <code>Unit</code>. This is perfectly reasonable. However, it is a little distracting, in my opinion, when we are constantly reminded of that fact by the REPL:</p><pre><code>$ cargo r -q
+</span></code></pre></div><p>That, in my opinion, is much easier to read.</p><h1 id=quality-of-life-improvements>Quality of life improvements</h1><p>Currently, evaluating a binding definition returns a <code>Unit</code>. This is perfectly reasonable. However, it is a little distracting, in my opinion, when we are constantly reminded of that fact by the REPL:</p><pre><code class=language-- data-lang=->$ cargo r -q
 → let a = 10 * 5
 [crates/eldiro-cli/src/main.rs:36] evaluated = Unit
 → let b = a
@@ -499,7 +499,7 @@ $
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo r -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
 → let a = 10 * 5
 → let b = a
 → let c = b
@@ -567,7 +567,7 @@ $
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>evaluated</span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s see if it works:</p><pre><code>$ cargo r -q
+</span></code></pre></div><p>Let’s see if it works:</p><pre><code class=language-- data-lang=->$ cargo r -q
 → let calculation = 10 * 10
 → calculation
 100

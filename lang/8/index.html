@@ -1,4 +1,4 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Eight: Function Definitions · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.7cfa553208e4e82e2fc9d5bf811b5e0cc2dce25d6805a2fcfc0efbe6934fdab4.css integrity="sha256-fPpVMgjk6C4vydW/gRteDMLc4l1oBaL8/A775pNP2rQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Eight: Function Definitions</h1><subtitle><ul><li>Posted in
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Eight: Function Definitions · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.a54facd29d28d59b7831fe13dd1bba216be79d56fa842078686bbb4859f2f893.css integrity="sha256-pU+s0p0o1Zt4Mf4T3Ru6IWvnnVb6hCB4aGu7SFny+JM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Eight: Function Definitions</h1><subtitle><ul><li>Posted in
 <a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>8 October 2020</li></ul></subtitle></header><main><p>First, we need to decide on a syntax. Let’s start with Rust’s syntax:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>frobnicate</span><span class=p>(</span><span class=n>foo</span>: <span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>bar</span>: <span class=nb>String</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Bar</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=p>...</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
@@ -112,7 +112,7 @@
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>body</span>: <span class=nc>Stmt</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s try compiling Eldiro:</p><pre><code>$ cargo c
+</span></code></pre></div><p>Let’s try compiling Eldiro:</p><pre><code class=language-- data-lang=->$ cargo c
 error[E0072]: recursive type `func_def::FuncDef` has infinite size
  --&gt; crates/eldiro/src/func_def.rs:4:1
   |
@@ -244,7 +244,7 @@ error: aborting due to 3 previous errors
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We should run the tests to see how we went:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>We should run the tests to see how we went:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ..........................................F.....
 failures:
@@ -294,7 +294,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We also use this approach of ‘keep extracting something (in this case identifiers) and stuff them into a <code>Vec</code> until you can’t continue’ in <code>Block::new</code>. Let’s see if it works:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>We also use this approach of ‘keep extracting something (in this case identifiers) and stuff them into a <code>Vec</code> until you can’t continue’ in <code>Block::new</code>. Let’s see if it works:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ..........................................F.....
 failures:
@@ -419,7 +419,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And now this works perfectly:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>And now this works perfectly:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ................................................
 test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -442,7 +442,7 @@ test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It passes:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>It passes:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 49 tests
 .................................................
 test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -766,7 +766,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This looks reasonable enough. Let’s run the tests:</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>This looks reasonable enough. Let’s run the tests:</p><pre><code class=language-- data-lang=->$ cargo t -q
 error[E0308]: mismatched types
   --&gt; crates/eldiro/src/expr.rs:89:21
    |
@@ -816,7 +816,7 @@ error: aborting due to 2 previous errors
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 46 tests
 .........F.F.FF.F.
 thread 'binding_def::tests::parse_binding_def' has overflowed its stack
@@ -858,7 +858,7 @@ fatal runtime error: stack overflow
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 46 tests
 .............F.F.F.F..F.......................
 failures:
@@ -986,11 +986,11 @@ test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 47 tests
 ...............................................
 test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Run <code>git stash pop</code> to get back the changes we made for function definitions. Let’s run the tests again to see if the new feature of <code>Expr::Operation</code> is being used successfully:</p><pre><code>$ cargo t -q
+</code></pre><p>Run <code>git stash pop</code> to get back the changes we made for function definitions. Let’s run the tests again to see if the new feature of <code>Expr::Operation</code> is being used successfully:</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 51 tests
 ...................................................
 test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
@@ -1123,7 +1123,7 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To stay consistent with <code>crate::stmt::tests::eval_binding_def</code>, the test doesn’t examine the effect it’s had on the <code>Env</code> &ndash; instead, it just checks that evaluating a function definition gives you a <code>Unit</code>.</p><pre><code>$ cargo t -q
+</span></code></pre></div><p>To stay consistent with <code>crate::stmt::tests::eval_binding_def</code>, the test doesn’t examine the effect it’s had on the <code>Env</code> &ndash; instead, it just checks that evaluating a function definition gives you a <code>Unit</code>.</p><pre><code class=language-- data-lang=->$ cargo t -q
 running 52 tests
 .............................................F......
 failures:
@@ -1169,7 +1169,7 @@ test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code>$ cargo t -q
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
 running 52 tests
 ....................................................
 test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
