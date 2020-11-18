@@ -56,7 +56,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>BinaryExpr</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser.rs
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -125,7 +125,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can write a test for parsing an expression with the negation operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr.rs
+</span></code></pre></div><p>We can write a test for parsing an expression with the negation operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -288,7 +288,7 @@ test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 25 tests
 .........................
 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write a test for parsing a bunch of nested parentheses:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser.rs
+</code></pre><p>Let’s write a test for parsing a bunch of nested parentheses:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
