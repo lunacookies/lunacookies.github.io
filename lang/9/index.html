@@ -4,7 +4,7 @@
 </span><span class=w></span><span class=n>no_params</span><span class=p>();</span><span class=w>
 </span></code></pre></div><p>Again, as I said in the previous part, parentheses and commas are annoying. Hence, Eldiro will use a different syntax in the spirit of ML-family languages:</p><pre><code>f a b c
 no_params
-</code></pre><p>Much cleaner! This doesn’t syntactically distinguish between calling a function with no parameters and using a binding, though &ndash; we don’t know during parsing whether <code>no_params</code> is a binding usage, or a function call with no parameters. We can solve this by looking at all the functions and bindings in scope during interpretation of a binding usage &ndash; if there’s a function with the name of the binding usage, we evaluate that with no parameters. If there isn’t, then we fall back to our usual strategy.</p><h1 id=parsing>Parsing</h1><p>We need a new module:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr.rs
+</code></pre><p>Much cleaner! This doesn’t syntactically distinguish between calling a function with no parameters and using a binding, though &ndash; we don’t know during parsing whether <code>no_params</code> is a binding usage, or a function call with no parameters. We can solve this by looking at all the functions and bindings in scope during interpretation of a binding usage &ndash; if there’s a function with the name of the binding usage, we evaluate that with no parameters. If there isn’t, then we fall back to our usual strategy.</p><h1 id=parsing>Parsing</h1><p>We need a new module:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>binding_usage</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>block</span><span class=p>;</span><span class=w>
@@ -108,7 +108,7 @@ failures:
     expr::func_call::tests::parse_func_call_with_no_params
 
 test result: FAILED. 52 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Whoa, that’s a lot of warnings! That must be because we haven’t used <code>FuncCall</code> anywhere. A function call is a kind of expression, so we should show that in the code:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr.rs
+</code></pre><p>Whoa, that’s a lot of warnings! That must be because we haven’t used <code>FuncCall</code> anywhere. A function call is a kind of expression, so we should show that in the code:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>binding_usage</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>block</span><span class=p>;</span><span class=w>
@@ -359,7 +359,7 @@ failures:
     func_def::tests::parse_func_def_with_multiple_params
 
 test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>That first test from before is still failing, and we did indeed fix <code>crate::expr::tests::parse_func_call</code>. We managed to break function definition parsing, though. Here’s the test in question:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/func_def.rs
+</code></pre><p>That first test from before is still failing, and we did indeed fix <code>crate::expr::tests::parse_func_call</code>. We managed to break function definition parsing, though. Here’s the test in question:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -406,7 +406,7 @@ test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now define <code>sequence1</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/utils.rs
+</span></code></pre></div><p>We can now define <code>sequence1</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence1</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
 </span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
@@ -481,7 +481,7 @@ test result: FAILED. 53 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 b
 </code></pre><p>in</p><pre><code>let b = a
 b
-</code></pre><p>is being parsed as a function call, rather than two separate entities (the first of these is the right-hand side of the binding definition, and the other is the final return value of the block). This is happening because <code>utils::sequence</code> (and by extension <code>utils::sequence1</code>) use <code>utils::extract_whitespace</code> internally, which consumes both spaces and newlines. Let’s create a separate <code>utils::extract_non_newline_whitespace</code>, and also allow for a custom separator in <code>utils::sequence</code> and <code>utils::sequence1</code>. That function name is a bit ridiculous though, and it will likely only be used once. Because of this I think it makes more sense to just pass in the function as a one-time closure to <code>utils::sequence1</code> in <code>FuncCall::new</code>.</p><p>Let’s make <code>utils::sequence</code> and <code>utils::sequence1</code> accept a custom separator first:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/utils.rs
+</code></pre><p>is being parsed as a function call, rather than two separate entities (the first of these is the right-hand side of the binding definition, and the other is the final return value of the block). This is happening because <code>utils::sequence</code> (and by extension <code>utils::sequence1</code>) use <code>utils::extract_whitespace</code> internally, which consumes both spaces and newlines. Let’s create a separate <code>utils::extract_non_newline_whitespace</code>, and also allow for a custom separator in <code>utils::sequence</code> and <code>utils::sequence1</code>. That function name is a bit ridiculous though, and it will likely only be used once. Because of this I think it makes more sense to just pass in the function as a one-time closure to <code>utils::sequence1</code> in <code>FuncCall::new</code>.</p><p>Let’s make <code>utils::sequence</code> and <code>utils::sequence1</code> accept a custom separator first:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
 </span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
@@ -531,7 +531,7 @@ b
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/func_def.rs
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -582,7 +582,7 @@ b
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’re using the same <code>take_while</code> function we used for <code>extract_whitespace</code>. The only thing left is to make <code>take_while</code> <code>pub(crate)</code> so that the <code>crate::expr::func_call</code> module can use it:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/utils.rs
+</span></code></pre></div><p>We’re using the same <code>take_while</code> function we used for <code>extract_whitespace</code>. The only thing left is to make <code>take_while</code> <code>pub(crate)</code> so that the <code>crate::expr::func_call</code> module can use it:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
@@ -598,7 +598,7 @@ b
 running 54 tests
 ......................................................
 test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=evaluation>Evaluation</h1><p>Let’s start with a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr.rs
+</code></pre><h1 id=evaluation>Evaluation</h1><p>Let’s start with a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
