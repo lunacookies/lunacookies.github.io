@@ -191,11 +191,11 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_block_with_multiple_stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
 </span><span class=w>            </span><span class=n>Block</span>::<span class=n>new</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=err>&#34;</span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>10</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>b</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>a</span><span class=w>
-</span><span class=w>    </span><span class=n>b</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=err>&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=s>&#34;{
+</span><span class=s>    let a = 10
+</span><span class=s>    let b = a
+</span><span class=s>    b
+</span><span class=s>}&#34;</span><span class=p>,</span><span class=w>
 </span><span class=w>            </span><span class=p>),</span><span class=w>
 </span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
 </span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
@@ -316,11 +316,11 @@ $ mv src/block.rs src/expr/
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_block_with_multiple_stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
 </span><span class=w>            </span><span class=n>Block</span>::<span class=n>new</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=err>&#34;</span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>10</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>b</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>a</span><span class=w>
-</span><span class=w>    </span><span class=n>b</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=err>&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=s>&#34;{
+</span><span class=s>    let a = 10
+</span><span class=s>    let b = a
+</span><span class=s>    b
+</span><span class=s>}&#34;</span><span class=p>,</span><span class=w>
 </span><span class=w>            </span><span class=p>),</span><span class=w>
 </span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
 </span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>

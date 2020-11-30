@@ -262,7 +262,7 @@ failures:
     stmt::tests::parse_func_def
 
 test result: FAILED. 48 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We have even more problems than before! What’s happened here is that all the binding usages in our tests are now being parsed as function calls with no parameters. Remember how I said earlier that a binding usage and a parameter-less function call are indistinguishable during parsing? That’s what we’re running into here.</p><p>We have two choices: abolish <code>BindingUsage</code> in favour of special-casing the evaluation of function calls with one parameter, or we could alternatively only parse function calls with one or more parameters. The first results in less code but is more work to change, while the second takes more code but is an easy change. Since we’re making this project just to learn at the moment, I’ll go for the easy option: only accepting function calls with one or more parameters.</p><p>We need to update our test first:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/func_call.rs
+</code></pre><p>We have even more problems than before! What’s happened here is that all the binding usages in our tests are now being parsed as function calls with no parameters. Remember how I said earlier that a binding usage and a parameter-less function call are indistinguishable during parsing? That’s what we’re running into here.</p><p>We have two choices: abolish <code>BindingUsage</code> in favour of special-casing the evaluation of function calls with one parameter, or we could alternatively only parse function calls with one or more parameters. The first results in less code but is more work to change, while the second takes more code but is an easy change. Since we’re making this project just to learn at the moment, I’ll go for the easy option: only accepting function calls with one or more parameters.</p><p>We need to update our test first:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -388,7 +388,7 @@ test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The <code>x</code> in <code>x + y</code> is being parsed as a function call with no parameters, rather than as a binding usage. Hmm, it must be because <code>utils::sequence</code> accepts sequences of lengths zero. A nice way of solving this is to create a wrapper around <code>sequence</code> that checks if the output is length zero, and, if it is, returns an error. First, though, we should make use of this hypothetical <code>sequence1</code> in <code>FuncCall::new</code> so we know immediately if our implementation is correct:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/func_call.rs
+</span></code></pre></div><p>The <code>x</code> in <code>x + y</code> is being parsed as a function call with no parameters, rather than as a binding usage. Hmm, it must be because <code>utils::sequence</code> accepts sequences of lengths zero. A nice way of solving this is to create a wrapper around <code>sequence</code> that checks if the output is length zero, and, if it is, returns an error. First, though, we should make use of this hypothetical <code>sequence1</code> in <code>FuncCall::new</code> so we know immediately if our implementation is correct:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -436,7 +436,7 @@ failures:
     expr::block::tests::parse_block_with_multiple_stmts
 
 test result: FAILED. 53 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Here’s <code>parse_block_with_multiple_stmts</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/block.rs
+</code></pre><p>Here’s <code>parse_block_with_multiple_stmts</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -446,11 +446,11 @@ test result: FAILED. 53 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_block_with_multiple_stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
 </span><span class=w>            </span><span class=n>Block</span>::<span class=n>new</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=err>&#34;</span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>10</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>b</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>a</span><span class=w>
-</span><span class=w>    </span><span class=n>b</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=err>&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=s>&#34;{
+</span><span class=s>    let a = 10
+</span><span class=s>    let b = a
+</span><span class=s>    b
+</span><span class=s>}&#34;</span><span class=p>,</span><span class=w>
 </span><span class=w>            </span><span class=p>),</span><span class=w>
 </span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
 </span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
@@ -514,7 +514,7 @@ b
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now need to update all the usages of <code>utils::sequence</code> and <code>utils::sequence1</code> to pass in the separators they use:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/block.rs
+</span></code></pre></div><p>We now need to update all the usages of <code>utils::sequence</code> and <code>utils::sequence1</code> to pass in the separators they use:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -564,7 +564,7 @@ b
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And now finally <code>FuncCall::new</code>, where we pass in a closure that accepts <em>only spaces,</em> not newlines. Let’s also adjust the extraction of whitespace after parsing out the callee so that it stays consistent:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/func_call.rs
+</span></code></pre></div><p>And now finally <code>FuncCall::new</code>, where we pass in a closure that accepts <em>only spaces,</em> not newlines. Let’s also adjust the extraction of whitespace after parsing out the callee so that it stays consistent:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -649,7 +649,7 @@ test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>How do you even evaluate a function call? The approach we’ll use is to create a new child environment from the environment being passed in, and add bindings for each of the parameters of the function call. After doing that we can evaluate the body of the function being called, knowing that the parameters used in the body are in the environment:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/func_call.rs
+</span></code></pre></div><p>How do you even evaluate a function call? The approach we’ll use is to create a new child environment from the environment being passed in, and add bindings for each of the parameters of the function call. After doing that we can evaluate the body of the function being called, knowing that the parameters used in the body are in the environment:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -671,7 +671,7 @@ test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 55 tests
 .......................................................
 test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Great! Let’s add another test to make sure we haven’t made any mistakes:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// still in src/expr/func_call.rs
+</code></pre><p>Great! Let’s add another test to make sure we haven’t made any mistakes:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// still in func_call.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -835,7 +835,7 @@ test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 59 tests
 ...........................................................
 test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We still haven’t implemented function calls with no parameters, though. Eldiro doesn’t currently have side effects of any kind, so we can’t test whether a parameter-less function call has taken place. Regardless, let’s implement the feature:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/binding_usage.rs
+</code></pre><p>We still haven’t implemented function calls with no parameters, though. Eldiro doesn’t currently have side effects of any kind, so we can’t test whether a parameter-less function call has taken place. Regardless, let’s implement the feature:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
