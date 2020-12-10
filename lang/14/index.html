@@ -1,0 +1,176 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Fourteen: Comments · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.9482a5d8d8ef313ce3494a8f0571bbf7fa47f9d65ad1e8d898e26a9d3d0a8abc.css integrity="sha256-lIKl2NjvMTzjSUqPBXG79/pH+dZa0ejYmOJqnT0Kirw="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Fourteen: Comments</h1><subtitle><ul><li>Posted in
+<a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>10 December 2020</li></ul></subtitle></header><main><p>The first thing we need to do is teach the lexer to recognise comments. We’ll begin with a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lex_comment</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=s>&#34;# foo&#34;</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Comment</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Here’s the implementation:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;#.*&#34;</span><span class=cp>)]</span><span class=w>
+</span><span class=w>    </span><span class=n>Comment</span><span class=p>,</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=cp>#[error]</span><span class=w>
+</span><span class=w>    </span><span class=n>Error</span><span class=p>,</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=n>Root</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>BinaryExpr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Just like with whitespace, it would be nice if we don’t have to manually handle comments in the parser. We could add extra checks to our existing <code>eat_whitespace</code> methods on <code>Sink</code> and <code>Source</code> for comments, but that’s annoying. What if we have other token kinds that we want to automatically skip in future?</p><p>There’s a name for this kind of irrelevant token: <em>trivia.</em> As far as I can tell, the term comes from <a href=https://github.com/dotnet/roslyn>Roslyn</a>. Let’s add an <code>is_trivia</code> method to <code>SyntaxKind</code> to abstract away this behaviour:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>is_trivia</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>matches</span><span class=o>!</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>Whitespace</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=n>Self</span>::<span class=n>Comment</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note how the method takes <code>self</code>; this is because it’s more efficient to pass <code>SyntaxKind</code> by value instead of by reference, since the size of <code>SyntaxKind</code> is one byte, which is less than the size of a reference (eight bytes on 64-bit systems). Also note that <code>is_trivia</code> won’t consume the instance of <code>SyntaxKind</code>, since <code>SyntaxKind</code> is <code>Copy</code>.</p><p>Now that we have a way to ask a <code>SyntaxKind</code> if it is trivia, we can use this method in <code>Sink</code> and <code>Source</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Source</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>next_lexeme</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lexeme</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>lexeme</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>peek_kind</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_kind_raw</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_trivia</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>at_trivia</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>at_trivia</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_kind_raw</span><span class=p>().</span><span class=n>map_or</span><span class=p>(</span><span class=kc>false</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>is_trivia</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_trivia</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>lexeme</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=o>!</span><span class=n>lexeme</span><span class=p>.</span><span class=n>kind</span><span class=p>.</span><span class=n>is_trivia</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=k>break</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>lexeme</span><span class=p>.</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>lexeme</span><span class=p>.</span><span class=n>text</span><span class=p>.</span><span class=n>into</span><span class=p>());</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s write a test to find out if what we’ve made works:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_comment</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
+</span><span class=w>            </span><span class=s>&#34;# hello!&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r##&#34;
+</span><span class=s>Root@0..8
+</span><span class=s>  Comment@0..8 &#34;# hello!&#34;&#34;##</span><span class=p>]],</span><span class=w>
+</span><span class=w>        </span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>The usage of an extra <code>#</code> in the raw string literal is to stop Rust from thinking that the <code>"#</code> in <code>Comment@0..8 "#</code> is meant to end the string literal.</p><pre><code class=language-- data-lang=->$ cargo t -q
+running 34 tests
+..................................
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><p>Let’s try parsing a binary expression interspersed with comments:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_binary_expression_interspersed_with_comments</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
+</span><span class=w>            </span><span class=s>&#34;
+</span><span class=s>1
+</span><span class=s>  + 1 # Add one
+</span><span class=s>  + 10 # Add ten&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r##&#34;
+</span><span class=s>Root@0..35
+</span><span class=s>  Whitespace@0..1 &#34;\n&#34;
+</span><span class=s>  BinaryExpr@1..35
+</span><span class=s>    BinaryExpr@1..21
+</span><span class=s>      Number@1..2 &#34;1&#34;
+</span><span class=s>      Whitespace@2..5 &#34;\n  &#34;
+</span><span class=s>      Plus@5..6 &#34;+&#34;
+</span><span class=s>      Whitespace@6..7 &#34; &#34;
+</span><span class=s>      Number@7..8 &#34;1&#34;
+</span><span class=s>      Whitespace@8..9 &#34; &#34;
+</span><span class=s>      Comment@9..18 &#34;# Add one&#34;
+</span><span class=s>      Whitespace@18..21 &#34;\n  &#34;
+</span><span class=s>    Plus@21..22 &#34;+&#34;
+</span><span class=s>    Whitespace@22..23 &#34; &#34;
+</span><span class=s>    Number@23..25 &#34;10&#34;
+</span><span class=s>    Whitespace@25..26 &#34; &#34;
+</span><span class=s>    Comment@26..35 &#34;# Add ten&#34;&#34;##</span><span class=p>]],</span><span class=w>
+</span><span class=w>        </span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>The test fails, since we aren’t lexing newlines. Let’s write a test for this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lex_spaces_and_newlines</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=s>&#34;  \n &#34;</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;[ </span><span class=se>\n</span><span class=s>]+&#34;</span><span class=cp>)]</span><span class=w>
+</span><span class=w>    </span><span class=n>Whitespace</span><span class=p>,</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>All our tests pass now:</p><pre><code class=language-- data-lang=->$ cargo t -q
+running 35 tests
+...................................
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><p>In the next part we’ll introduce another new concept to our parser: markers.</p></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/13/>Part Thirteen: Whitespace & Events</a></div><div style=clear:both></div></nav></body></html>
