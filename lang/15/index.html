@@ -1,0 +1,803 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Fifteen: Markers · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.f1f9caf17a718dd94ab1e116791d9077b0f94c2f2e23a04d90964e8ef64770b4.css integrity="sha256-8fnK8XpxjdlKseEWeR2Qd7D5TC8uI6BNkJZOjvZHcLQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Fifteen: Markers</h1><subtitle><ul><li>Posted in
+<a class=current-section href=https://arzg.github.io/lang/>Make A Language</a></li><li>16 December 2020</li></ul></subtitle></header><main><p>A ‘marker’ is an abstraction over Rowan that makes working with it nicer, and also allows for some fancier parsing techniques. You can think of them as a fancy version of the checkpoints we’ve been using up to this point. Here’s a rough sketch of the API we’ll create:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Parser</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>struct</span> <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>...</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>struct</span> <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>...</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>precede</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Additionally, we will ensure that <code>Marker</code> panics if it has been dropped without being completed.</p><p><code>Parser::start</code> creates a new marker at the parser’s current position. After creating a marker, we can <code>bump</code> tokens and start new nodes as normal; once we’re done we call <code>complete</code> on the marker, which wraps, in a <code>SyntaxKind</code> of our choice, all the tokens and nodes added since the marker’s creation.</p><p>Markers’ property of panicking if they haven’t been completed is one of the benefits they have over plain <code>Parser::start_node</code> and <code>finish_node</code> calls. If you forget to call <code>finish_node</code> you get a panic with a cryptic message from Rowan. If you forget to complete a marker, though, you instead get a clearer panic message with a backtrace that tells you where the marker was dropped.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><p>If we later decide that we really should have wrapped that node in another node, we can call <code>precede</code> on the <code>CompletedMarker</code> that <code>Marker::complete</code> returned to us. This <code>precede</code> method gives us a marker, meaning that we can once again add to the syntax tree and later call <code>Marker::complete</code>.</p><p>Note that the existence of <code>Marker</code> means that we won’t need <code>Parser::start_node</code> or <code>finish_node</code>; we can just create markers and complete them later. Similarly, <code>CompletedMarker</code> supersedes <code>Parser::checkpoint</code> and <code>Parser::start_node_at</code>.</p><p>Let’s begin by writing an implementation of <code>Parser::start</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>Marker</span>::<span class=n>new</span><span class=p>(</span><span class=n>pos</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s define <code>Marker</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>pos</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>The next step is to define <code>Marker::complete</code>. Remember that what this does is wrap, in a given <code>SyntaxKind</code>, all the nodes and tokens pushed to the syntax tree since the marker was instantiated. We <em>could</em> use <code>Vec::insert</code> to insert the appropriate <code>Event::StartNode</code> event at the marker’s position; this would throw off the positions of other markers. The solution is to add a ‘placeholder’ variant to <code>Event</code> that we push when the marker is created. When <code>Marker::complete</code> is called we can then replace this placeholder with the real <code>StartNode</code> event, and then finish the node:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span>: <span class=kt>usize</span> <span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>text</span>: <span class=nc>SmolStr</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>FinishNode</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Placeholder</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Marker</span>::<span class=n>new</span><span class=p>(</span><span class=n>pos</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=c1>// we aren’t making this method return a CompletedMarker just yet ...
+</span><span class=c1></span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>];</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=o>*</span><span class=n>event_at_pos</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=o>*</span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span></code></pre></div><p>Note how we include a sanity check to ensure the event we’re changing is a placeholder, allowing us to catch bugs earlier.</p><p>We have to tell the sink what to do if it encounters a placeholder event; this should never happen (they should all be removed by <code>Marker::complete</code>):</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s ensure that markers are never accidentally dropped without being completed:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>completed</span>: <span class=kt>bool</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>pos</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>completed</span>: <span class=nc>false</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>completed</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=kc>true</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>];</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=o>*</span><span class=n>event_at_pos</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=o>*</span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=nb>Drop</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>drop</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=o>!</span><span class=bp>self</span><span class=p>.</span><span class=n>completed</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>panic</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;Markers need to be completed&#34;</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>It’s annoying to have to maintain that boolean though; let’s use the <a href=https://docs.rs/drop_bomb>drop_bomb</a> crate to handle this for us:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
+<span class=nx>logos</span> <span class=p>=</span> <span class=s2>&#34;0.11.4&#34;</span>
+<span class=nx>num</span><span class=err>-</span><span class=nx>derive</span> <span class=p>=</span> <span class=s2>&#34;0.3.3&#34;</span>
+<span class=nx>num</span><span class=err>-</span><span class=nx>traits</span> <span class=p>=</span> <span class=s2>&#34;0.2.14&#34;</span>
+<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>drop_bomb</span>::<span class=n>DropBomb</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>bomb</span>: <span class=nc>DropBomb</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>pos</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>bomb</span>: <span class=nc>DropBomb</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;Markers need to be completed&#34;</span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>bomb</span><span class=p>.</span><span class=n>defuse</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>];</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=o>*</span><span class=n>event_at_pos</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=o>*</span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p><code>DropBomb</code> panics when it’s dropped unless its <code>defuse</code> method has been called.</p><p>Let’s try out our new marker support by replacing the usage of <code>Parser::start_node</code> in <code>Parser::parse</code> with markers:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=n>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+running 35 tests
+...................................
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><p>It’s now time to remove our usage of checkpoints and transition to using <code>precede</code> on <code>CompletedMarker</code>. Fortunately for us there’s only one place where we use checkpoints: <code>expr_binding_power</code>. The first modification we need to make is to store a <code>CompletedMarker</code> of the the left-hand side of the binary expression, so that we can later call <code>precede</code> on it:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>)</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>(),</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>PrefixOp</span>::<span class=n>Neg</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=p>((),</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>op</span><span class=p>.</span><span class=n>binding_power</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=c1>// Eat the operator’s token.
+</span><span class=c1></span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>start_node_at</span><span class=p>(</span><span class=n>checkpoint</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>PrefixExpr</span><span class=p>);</span><span class=w>
+</span><span class=w>            </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>);</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>finish_node</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=mi>0</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>RParen</span><span class=p>));</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=p>,</span><span class=w> </span><span class=c1>// we’ll handle errors later.
+</span><span class=c1></span><span class=w>    </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>None of the <code>match</code>’s arms have the type <code>CompletedMarker</code>, though. Remember that we can only obtain a <code>CompletedMarker</code> by completing a marker (what a surprise!); thus, it stands to reason that we have to both create a marker and complete it in each arm of the <code>match</code>. Each of the things we parse into <code>lhs</code> need their own <code>SyntaxKind</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=n>Root</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>BinaryExpr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>ParenExpr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We can now make <code>lhs</code> a <code>CompletedMarker</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Literal</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableRef</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>PrefixOp</span>::<span class=n>Neg</span><span class=p>;</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=p>((),</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>op</span><span class=p>.</span><span class=n>binding_power</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=c1>// Eat the operator’s token.
+</span><span class=c1></span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>PrefixExpr</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>            </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=mi>0</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>RParen</span><span class=p>));</span><span class=w>
+</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>ParenExpr</span><span class=p>)</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=p>,</span><span class=w> </span><span class=c1>// we’ll handle errors later.
+</span><span class=c1></span><span class=w>    </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s make use of <code>lhs</code> and eradicate the last remaining reference to checkpoints in <code>expr_binding_power</code>. We’ll do this by calling <code>precede</code> on <code>lhs</code> before recursing, giving us a marker we can complete afterwards:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Plus</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>InfixOp</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>InfixOp</span>::<span class=n>Sub</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Star</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>InfixOp</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Slash</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>InfixOp</span>::<span class=n>Div</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=p>,</span><span class=w> </span><span class=c1>// we’ll handle errors later.
+</span><span class=c1></span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>left_binding_power</span><span class=p>,</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>op</span><span class=p>.</span><span class=n>binding_power</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>left_binding_power</span><span class=w> </span><span class=o>&lt;</span><span class=w> </span><span class=n>minimum_binding_power</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>return</span><span class=p>;</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// Eat the operator’s token.
+</span><span class=c1></span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>.</span><span class=n>precede</span><span class=p>(</span><span class=n>p</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>BinaryExpr</span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>To make sure that we keep ‘wrapping around’ the expressions we’re parsing, we assign the result of completing the marker to <code>lhs</code>.</p><p>We haven’t implemented <code>CompletedMarker</code>, though, so <code>lhs</code> really has the type of <code>()</code> and <code>precede</code> isn’t defined. First, let’s make <code>Marker::complete</code> return a <code>CompletedMarker</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>bomb</span><span class=p>.</span><span class=n>defuse</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>];</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=o>*</span><span class=n>event_at_pos</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=o>*</span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>pos</span>: <span class=nc>self</span><span class=p>.</span><span class=n>pos</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>The next missing piece is <code>CompletedMarker::precede</code>. Implementing this is tricky; let’s think about how we might approach this problem as we write out a skeleton:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>precede</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>new_m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>todo</span><span class=o>!</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>new_m</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We have the same problem as with <code>Marker::complete</code>; we can’t use <code>Vec::insert</code> or a similar method to shuffle around <code>p.events</code>, as that would invalidate the indices into <code>events</code> that other <code>Marker</code>s and <code>CompletedMarker</code>s use.</p><p>The solution is ingenious: we add another field to <code>Event::StartNode</code> that stores a relative offset from that event <em>forward</em> to its <em>parent.</em> We modify the event at the <code>CompletedMarker</code>’s position so that its <em>forward parent</em> is the marker returned by <code>precede</code>. We can get this <em>forward parent</em> offset with <code>new_m.pos - self.pos</code>.</p><pre><code class=language-- data-lang=->↓ this distance here is the first event’s forward_parent
+/-  Event::StartNode { kind: Foo }  &lt;- the event at which
+|   ...                                the marker was created
+|   ... blah blah more events
+|   ...
+\-  Event::StartNode { kind: Placeholder }  &lt;- new_m
+</code></pre><p>Here’s the implementation:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>forward_parent</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=kt>usize</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>checkpoint</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>text</span>: <span class=nc>SmolStr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>FinishNode</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Placeholder</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>precede</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>new_m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>ref</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=p>..</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>]</span><span class=w>
+</span><span class=w>        </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=o>*</span><span class=n>forward_parent</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>new_m</span><span class=p>.</span><span class=n>pos</span><span class=w> </span><span class=o>-</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>new_m</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Once again we panic (this time with <code>unreachable!()</code>) if the event we’re trying to modify isn’t what we expect.</p><p>There are a number of references to <code>Event::StartNode</code> that need to be updated due to the new field we’ve added:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>bomb</span><span class=p>.</span><span class=n>defuse</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>pos</span><span class=p>];</span><span class=w>
+</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=o>*</span><span class=n>event_at_pos</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=o>*</span><span class=n>event_at_pos</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>forward_parent</span>: <span class=nb>None</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>pos</span>: <span class=nc>self</span><span class=p>.</span><span class=n>pos</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start_node</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>forward_parent</span>: <span class=nb>None</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>});</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>The only other references to <code>Event::StartNode</code> that need to be updated are in <code>Sink::finish</code>, which we need to modify anyway to account for <code>forward_parent</code>.</p><p>Remove the first section of <code>Sink::finish</code> that handles checkpoints, since we aren’t using them anymore:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>))</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>To support <code>forward_parent</code> we need to ‘pull forward’ the parent, start its node, and then start the node of the event we’re currently looking at. Keep in mind that <code>forward_parent</code> is just an offset, so we need to add it to the index we’re currently up to:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>event</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>enumerate</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                    </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>fp</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>fp</span><span class=p>]</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We now have an error from trying to use <code>self.events</code> after it was moved by <code>into_iter</code>. Using references won’t work since we need to have ownership to call <code>Sink::token</code>. Let’s try using raw indices into <code>self.events</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=mi>0</span><span class=p>..</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>]</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                    </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>fp</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>fp</span><span class=p>]</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We still have the same error, but now it’s situated at the <code>match</code> instead of the loop. To get ownership we can replace events we have processed with the placeholder:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>,</span><span class=w> </span><span class=n>SmolStr</span><span class=p>};</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>mem</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=mi>0</span><span class=p>..</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                    </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>fp</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>fp</span><span class=p>]</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Running the tests shows that a lot of the tests have diffs from those extra wrapping nodes we had to add to <code>lhs</code>. This is a great opportunity to use expect-test’s updating feature &ndash; wait, no, it isn’t! Look at the diffs; some of the tests that haven’t panicked are generating the wrong syntax trees. The ones that are panicking are doing so because the number of <code>start_node</code> didn’t match the number of <code>finish_node</code> calls.</p><p>Hmm, why is this happening?</p><p>Ah! When we index into <code>self.events</code> to extract the forward parent, we don’t replace this event with the placeholder. This means that it is iterated over again, causing an overabundance of <code>start_node</code> calls.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=mi>0</span><span class=p>..</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                    </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>fp</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w>
+</span><span class=w>                            </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>fp</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w>
+</span><span class=w>                        </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note that we had to update the match arm that handles <code>Event::Placeholder</code> to do nothing, since we now intentionally encounter placeholders (i.e. it isn’t a bug anymore if we see a placeholder).</p><p>None of our tests panic now! For the majority of them the parser outputs the correct syntax tree. However, there are a few, more complex test cases for which the new version is wrong. Take, for example, <code>parse_left_associative_binary_expression</code>. We can run this test individually by running <code>cargo t left_assoc</code> (or any other unique substring of the test name). Let’s manually update the expected syntax tree so that we can tell whether the parser is broken:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_left_associative_binary_expression</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
+</span><span class=w>            </span><span class=s>&#34;1+2+3+4&#34;</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
+</span><span class=s>Root@0..7
+</span><span class=s>  BinaryExpr@0..7
+</span><span class=s>    BinaryExpr@0..5
+</span><span class=s>      BinaryExpr@0..3
+</span><span class=s>        Literal@0..1
+</span><span class=s>          Number@0..1 &#34;1&#34;
+</span><span class=s>        Plus@1..2 &#34;+&#34;
+</span><span class=s>        Literal@2..3
+</span><span class=s>          Number@2..3 &#34;2&#34;
+</span><span class=s>      Plus@3..4 &#34;+&#34;
+</span><span class=s>      Literal@4..5
+</span><span class=s>        Number@4..5 &#34;3&#34;
+</span><span class=s>    Plus@5..6 &#34;+&#34;
+</span><span class=s>    Literal@6..7
+</span><span class=s>      Number@6..7 &#34;4&#34;&#34;#</span><span class=p>]],</span><span class=w>
+</span><span class=w>        </span><span class=p>);</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Running the test again shows that the parser is outputting an incorrect syntax tree:</p><pre><code>Root@0..7
+  BinaryExpr@0..3
+    Literal@0..1
+      Number@0..1 &quot;1&quot;
+    Plus@1..2 &quot;+&quot;
+    Literal@2..3
+      Number@2..3 &quot;2&quot;
+  Plus@3..4 &quot;+&quot;
+  BinaryExpr@4..7
+    BinaryExpr@4..5
+      Literal@4..5
+        Number@4..5 &quot;3&quot;
+    Plus@5..6 &quot;+&quot;
+    Literal@6..7
+      Number@6..7 &quot;4&quot;
+</code></pre><p>The <code>BinaryExpr</code> nodes aren’t being nested correctly. Let’s print <code>self.events</code> at the start of <code>Sink::finish</code> to see the events the parser generated:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Here’s what that gives us:</p><pre><code>[crates/eldiro/src/parser/sink.rs:25] &amp;self.events = [
+    StartNode {
+        kind: Root,
+        forward_parent: None,
+    },
+    StartNode {
+        kind: Literal,
+        forward_parent: Some(
+            4,
+        ),
+    },
+    AddToken {
+        kind: Number,
+        text: &quot;1&quot;,
+    },
+    FinishNode,
+    AddToken {
+        kind: Plus,
+        text: &quot;+&quot;,
+    },
+    StartNode {
+        kind: BinaryExpr,
+        forward_parent: Some(
+            6,
+        ),
+    },
+    StartNode {
+        kind: Literal,
+        forward_parent: None,
+    },
+    AddToken {
+        kind: Number,
+        text: &quot;2&quot;,
+    },
+    FinishNode,
+    FinishNode,
+    AddToken {
+        kind: Plus,
+        text: &quot;+&quot;,
+    },
+    StartNode {
+        kind: BinaryExpr,
+        forward_parent: Some(
+            6,
+        ),
+    },
+    StartNode {
+        kind: Literal,
+        forward_parent: None,
+    },
+    AddToken {
+        kind: Number,
+        text: &quot;3&quot;,
+    },
+    FinishNode,
+    FinishNode,
+    AddToken {
+        kind: Plus,
+        text: &quot;+&quot;,
+    },
+    StartNode {
+        kind: BinaryExpr,
+        forward_parent: None,
+    },
+    StartNode {
+        kind: Literal,
+        forward_parent: None,
+    },
+    AddToken {
+        kind: Number,
+        text: &quot;4&quot;,
+    },
+    FinishNode,
+    FinishNode,
+    FinishNode,
+]
+</code></pre><p>What a mess! I have a hunch that there’s something wrong with how we handle <code>forward_parent</code> in the sink, since the nesting of <code>BinaryExpr</code>s &ndash; something that happens through <code>CompletedMarker::precede</code> and therefore <code>forward_parent</code> &ndash; is broken. Let’s start at the first occurrence of an event with a forward parent: the second event. This node’s forward parent is <code>4</code>, meaning that it is four events down, which is a <code>StartNode { kind: BinaryExpr }</code>. Curiously, this node itself has a forward parent of <code>6</code>, which <em>also</em> has a forward parent! We need to <code>start_node</code> the last forward parent in the chain <em>first,</em> then the one before that and the one before that until we get to the node that started the chain. Currently in the sink we only handle the original node and its forward parent, but no levels deeper than that. Instead, we should keep checking for forward parents in a loop, accumulating them in a vector. Afterwards we can loop through this vector in reverse (to ensure the last node in the chain of forward parents is started first) and call <code>start_node</code> on each one.</p><p>Enough talking, let’s write the code:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=mi>0</span><span class=p>..</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                    </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>kinds</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>vec</span><span class=o>!</span><span class=p>[</span><span class=n>kind</span><span class=p>];</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>idx</span><span class=p>;</span><span class=w>
+</span><span class=w>                    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=c1>// Walk through the forward parent of the forward parent, and the forward parent
+</span><span class=c1></span><span class=w>                    </span><span class=c1>// of that, and of that, etc. until we reach a StartNode event without a forward
+</span><span class=c1></span><span class=w>                    </span><span class=c1>// parent.
+</span><span class=c1></span><span class=w>                    </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>fp</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>forward_parent</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=n>idx</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=n>fp</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>                        </span><span class=n>forward_parent</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>kind</span><span class=p>,</span><span class=w>
+</span><span class=w>                            </span><span class=n>forward_parent</span><span class=p>,</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w>
+</span><span class=w>                            </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w>
+</span><span class=w>                        </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>kinds</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>kind</span><span class=p>);</span><span class=w>
+</span><span class=w>                            </span><span class=n>forward_parent</span><span class=w>
+</span><span class=w>                        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                            </span><span class=n>unreachable</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>                        </span><span class=p>};</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>                    </span><span class=k>for</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>kinds</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>rev</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>));</span><span class=w>
+</span><span class=w>                    </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=p>}</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t left_assoc
+running 1 test
+test parser::expr::tests::parse_left_associative_binary_expression ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out
+</code></pre><p>At least that one test we’ve been looking at is passing. If we try running our entire suite, we’ll find that every single test failure is due to the changes we made to <code>lhs</code>. It is time to update all our failing tests automatically:</p><pre><code class=language-- data-lang=->$ UPDATE_EXPECT=1 cargo t -q
+running 35 tests
+...................................
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><p>All that’s left is to delete <code>Parser::start_node</code>, <code>Parser::start_node_at</code>, <code>Parser::finish_node</code>, <code>Parser::checkpoint</code>, <code>Event::StartNodeAt</code>, and the line from the <code>match</code> in <code>Sink::finish</code> that handles <code>Event::StartNodeAt</code>.</p><p>Thanks for following this series up to here! The next part will consist of a few refactorings to keep the code clean.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>It would be ideal if this was a compile time error; <em>linear typing</em> is the ability of a language to enforce at compile time that objects are used once, not more or less, and would come in handy here. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/14/>Part Fourteen: Comments</a></div><div style=clear:both></div></nav></body></html>
