@@ -1,0 +1,941 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Nineteen: Code Representations · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4ccf1a7843522b2685906df1bebc02492124e67ff3245367f4d55fbd283b50fb.css integrity="sha256-TM8aeENSKyaFkG3xvrwCSSEk5n/zJFNn9NVfvSg7UPs="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script>window.onload=()=>{quicklink.listen();};</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=page-nav><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header><h1>Part Nineteen: Code Representations</h1><subtitle><ul><li>24 January 2020</li><li>3134 words</li><li>16 minute read</li></ul></subtitle></header><main><p>So far we have only used two different data structures to represent code:</p><ul><li>abstract syntax trees</li><li>concrete syntax trees</li></ul><p>An <em>abstract syntax tree</em> is a data structure that represents the bare minimum about a chunk of code. We used ASTs in the early parts of this series prior to the Rowan rewrite. For example, here’s an AST that represents variable definitions:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>value</span>: <span class=nc>Expr</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note how it doesn’t include the <code>let</code> token or the <code>=</code>, and ignores trivia like whitespace and comments; it’s <em>abstract,</em> and only contains the information necessary to implement, say, a compiler. Although this makes them convenient to work with, it also prevents us from implementing some IDE features on top of them.</p><p>Automatic refactorings are a good example. How are meant to implement a feature that relies on knowing and being able to modify source code when we don’t know the exact text of the code being analysed?</p><p><em>Concrete syntax trees,</em> on the other hand, include the text of the source code in full. We’ve used CSTs whenever we’ve used Rowan, as the trees it produces can reproduce the text they were created from. Here’s a CST (in this case from Rowan) that represents a binary expression:</p><pre><code>Root@0..5
+  InfixExpr@0..5
+    Literal@0..2
+      Number@0..1 &quot;1&quot;
+      Whitespace@1..2 &quot; &quot;
+    Plus@2..3 &quot;+&quot;
+    Whitespace@3..4 &quot; &quot;
+    Literal@4..5
+      Number@4..5 &quot;1&quot;
+</code></pre><p>It includes the entire input, whitespace and all. An interesting feature of Rowan’s CSTs is that they are <em>untyped,</em> meaning that nodes of differing kinds (e.g. <code>VariableDef</code> and <code>InfixExpr</code>) have the same type &ndash; <code>SyntaxNode</code>. Although this means we can implement features that don’t depend on node kinds more easily than we could otherwise,<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> it also means that more complex analysis on Rowan CSTs is painful, since we need to call <code>.kind()</code> whenever we want to know a node’s kind. We wouldn’t have to do this if nodes of different kinds had different types.</p><p>Programming language implementations that use Rowan usually include a typed layer on top of the CST for analysis purposes. Confusingly, this layer is called an AST in spite of its knowledge of the full input text, since it uses an unmodified Rowan CST under the hood. Here’s an example of what one for binary expressions might look like:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>BinaryExpr</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>BinaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lhs</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// do stuff to extract the left-hand side
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>rhs</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// do stuff to extract the right-hand side
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>op</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>BinaryOp</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// do stuff to extract the operator
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note how all these methods return <code>Option</code>s &ndash; this is because the parser supports error recovery and allows incomplete trees; as such, these methods cannot be sure that the thing they are trying to extract is actually present.</p><p>Note also how the API provided by this is similar to the simple <code>struct</code> from earlier, with the distinction that components are accessed through methods that return <code>Option</code>, rather than non-optional fields.</p><p>Finally, programming language implementations with Rowan usually include one more, higher-level representation: the <em>high-level intermediate representation,</em> or HIR. These are equivalent to the classical ASTs that we used before the rewrite. For comparison, here’s what a HIR data structure that represents binary expressions could look like:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>BinaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>lhs</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>rhs</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>op</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>BinaryOp</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>HIRs can make it easier to implement the parts of a programming language that don’t have to worry about original source code text, because this very property &ndash; the ability to differ from the original input &ndash; allows for the use of <em>lowering.</em></p><p>Lowering is the process of changing syntactic sugar, or shorthand, into its lower-level form. For example, a <code>while</code> loop is syntactic sugar for a <code>loop</code> with an <code>if</code> statement:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>while</span><span class=w> </span><span class=o>!</span><span class=n>should_exit</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>handle_connection</span><span class=p>();</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// is sugar for
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>should_exit</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>break</span><span class=p>;</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=n>handle_connection</span><span class=p>();</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Imagine you’re implementing a Rust type checker &ndash; if you don’t lower <code>while</code> loops, you need to worry about type-checking both <code>loop</code> statements and <code>while</code> loops. However, if you lower <code>while</code> loops into <code>loop</code> statements, you’d only have to implement type-checking for <code>loop</code>. The same principle can be applied to lots of other components of programming language tooling.</p><p>Lowering isn’t possible with a Rowan AST, as it has to represent the input text losslessly. It <em>is</em> possible with a HIR, though, since they don’t have to correspond with the input text.</p><p>Eldiro will use three different code representations:</p><ul><li>CST (Rowan), constructed during parsing</li><li>AST (typed layer on top of untyped CST) for anything that needs to deal with source code directly (e.g. refactorings)</li><li>HIR (abstract, lowered representation) for everything else</li></ul><h1 id=implementing-an-ast>Implementing an AST</h1><p>Although we could stick this in an existing crate, it doesn’t really belong in any of them. Let’s create a new one:</p><pre><code class=language-- data-lang=->$ cargo new --lib crates/ast
+     Created library `crates/ast` package
+</code></pre><p>This crate will need to use <code>SyntaxNode</code> from the <code>syntax</code> crate, so we’ll add that as a dependency:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># crates/ast/Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+</code></pre></div><p>Let’s start by writing the skeleton of a variable definition’s AST node:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>VariableDef</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;?&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>todo</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>value</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;?&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>todo</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s look at a typical <code>VariableDef</code> CST to remind us of its structure:</p><pre><code>Root@0..13
+  VariableDef@0..13
+    LetKw@0..3 &quot;let&quot;
+    Whitespace@3..4 &quot; &quot;
+    Ident@4..7 &quot;foo&quot;
+    Whitespace@7..8 &quot; &quot;
+    Equals@8..9 &quot;=&quot;
+    Whitespace@9..10 &quot; &quot;
+    VariableRef@10..13
+      Ident@10..13 &quot;bar&quot;
+</code></pre><p>We would want <code>VariableDef::name</code> to return that <code>Ident</code>, a token, not a node, and <code>VariableDef::value</code> should return the <code>VariableRef</code> node. We have a type for nodes from the Rowan syntax tree &ndash; <code>SyntaxNode</code>. We don’t have a type for tokens from the Rowan CST though; let’s create that now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>type</span> <span class=nc>SyntaxNode</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SyntaxNode</span><span class=o>&lt;</span><span class=n>EldiroLanguage</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>type</span> <span class=nc>SyntaxToken</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SyntaxToken</span><span class=o>&lt;</span><span class=n>EldiroLanguage</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>We can now fill in those missing types from the AST:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxNode</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxToken</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxToken</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>todo</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>value</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxNode</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>todo</span><span class=o>!</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>To determine a <code>VariableDef</code>’s name, we would want to iterate over its child tokens, stoping at the first one whose kind is <code>Ident</code>. Rowan doesn’t give us a way to iterate over only the child tokens of a node, so we’ll iterate over the tokens <em>and</em> nodes (known to Rowan as <code>SyntaxElement</code>s), filtering out the nodes:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxNode</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxToken</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxToken</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mi>0</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>children_with_tokens</span><span class=p>()</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>filter_map</span><span class=p>(</span><span class=n>SyntaxElement</span>::<span class=n>into_token</span><span class=p>)</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>find</span><span class=p>(</span><span class=o>|</span><span class=n>token</span><span class=o>|</span><span class=w> </span><span class=n>token</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We need to define our own version of <code>SyntaxElement</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>type</span> <span class=nc>SyntaxNode</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SyntaxNode</span><span class=o>&lt;</span><span class=n>EldiroLanguage</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>type</span> <span class=nc>SyntaxToken</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SyntaxToken</span><span class=o>&lt;</span><span class=n>EldiroLanguage</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>type</span> <span class=nc>SyntaxElement</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SyntaxElement</span><span class=o>&lt;</span><span class=n>EldiroLanguage</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>And import it from <code>ast</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxElement</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxNode</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxToken</span><span class=p>};</span><span class=w>
+</span></code></pre></div><p>Let’s define <code>VariableDef::value</code> by finding the first child node that is an expression. For this we can use the non-existent <code>Expr::cast</code> function:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>value</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>find_map</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span></code></pre></div><p>To continue we have to define <code>Expr</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>BinaryExpr</span><span class=p>(</span><span class=n>BinaryExpr</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=p>(</span><span class=n>Literal</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>ParenExpr</span><span class=p>(</span><span class=n>ParenExpr</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>UnaryExpr</span><span class=p>(</span><span class=n>UnaryExpr</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=p>(</span><span class=n>VariableRef</span><span class=p>),</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s define each of its variant types:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>BinaryExpr</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Literal</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>ParenExpr</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>UnaryExpr</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>VariableRef</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span></code></pre></div><p>The only remaining compile error is <code>Expr::cast</code>, which we can define:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>cast</span><span class=p>(</span><span class=n>node</span>: <span class=nc>SyntaxNode</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>node</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>InfixExpr</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>BinaryExpr</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Literal</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>Literal</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>ParenExpr</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>ParenExpr</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>PrefixExpr</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>UnaryExpr</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>VariableRef</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>VariableRef</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=w> </span><span class=nb>None</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We’re still missing an AST node, namely <code>Stmt</code>. Its definition is similar to <code>Expr</code>’s:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableDef</span><span class=p>(</span><span class=n>VariableDef</span><span class=p>),</span><span class=w>
+</span><span class=w>    </span><span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span><span class=p>),</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>cast</span><span class=p>(</span><span class=n>node</span>: <span class=nc>SyntaxNode</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>node</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>VariableDef</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>VariableDef</span><span class=p>(</span><span class=n>node</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>(</span><span class=n>node</span><span class=p>)</span><span class=o>?</span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Next, let’s add methods to <code>BinaryExpr</code> to extract the left-hand side, right-hand side and operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BinaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>lhs</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>find_map</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>rhs</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>filter_map</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>).</span><span class=n>nth</span><span class=p>(</span><span class=mi>1</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>op</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxToken</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mi>0</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>children_with_tokens</span><span class=p>()</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>filter_map</span><span class=p>(</span><span class=n>SyntaxElement</span>::<span class=n>into_token</span><span class=p>)</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>find</span><span class=p>(</span><span class=o>|</span><span class=n>token</span><span class=o>|</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>matches</span><span class=o>!</span><span class=p>(</span><span class=w>
+</span><span class=w>                    </span><span class=n>token</span><span class=p>.</span><span class=n>kind</span><span class=p>(),</span><span class=w>
+</span><span class=w>                    </span><span class=n>SyntaxKind</span>::<span class=n>Plus</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Star</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Slash</span><span class=p>,</span><span class=w>
+</span><span class=w>                </span><span class=p>)</span><span class=w>
+</span><span class=w>            </span><span class=p>})</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p><code>UnaryExpr</code> also needs equivalents of these:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>UnaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>find_map</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>op</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxToken</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mi>0</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>children_with_tokens</span><span class=p>()</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>filter_map</span><span class=p>(</span><span class=n>SyntaxElement</span>::<span class=n>into_token</span><span class=p>)</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>find</span><span class=p>(</span><span class=o>|</span><span class=n>token</span><span class=o>|</span><span class=w> </span><span class=n>token</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>And <code>ParenExpr</code> could use a method that extracts the contained expression:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>ParenExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>find_map</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>cast</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p><code>VariableRef</code> and <code>Literal</code> too:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxElement</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxNode</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxToken</span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>u64</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>parse</span><span class=p>().</span><span class=n>unwrap</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>SmolStr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>clone</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s add the missing <code>smol_str</code> dependency:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
+<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+</code></pre></div><p>Finally, we need to define the root of the AST:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Root</span><span class=p>(</span><span class=n>SyntaxNode</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Root</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>cast</span><span class=p>(</span><span class=n>node</span>: <span class=nc>SyntaxNode</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>node</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>Self</span><span class=p>(</span><span class=n>node</span><span class=p>))</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=nb>None</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>For any other code to be able to interact with the contents of <code>Root</code>, it needs to have methods that make its contents accessible. Since the parser currently consumes multiple statements, so we can make those available:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Root</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmts</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>impl</span><span class=w> </span><span class=nb>Iterator</span><span class=o>&lt;</span><span class=n>Item</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Stmt</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>children</span><span class=p>().</span><span class=n>filter_map</span><span class=p>(</span><span class=n>Stmt</span>::<span class=n>cast</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s try this code out by printing the value of any variable definition we might see in the syntax tree when in the REPL:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>debug_tree</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>String</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>tree</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;{:#?}&#34;</span><span class=p>,</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>syntax</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>syntax</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>SyntaxNode</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>SyntaxNode</span>::<span class=n>new_root</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>green_node</span><span class=p>.</span><span class=n>clone</span><span class=p>())</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/main.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
+</span><span class=w>        </span><span class=n>println</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>()).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>root</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>stmts</span><span class=p>()</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>filter_map</span><span class=p>(</span><span class=o>|</span><span class=n>stmt</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>var_def</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=nb>Some</span><span class=p>(</span><span class=n>var_def</span><span class=p>.</span><span class=n>value</span><span class=p>())</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=nb>None</span><span class=w>
+</span><span class=w>            </span><span class=p>})</span><span class=w>
+</span><span class=w>            </span><span class=p>.</span><span class=n>collect</span>::<span class=o>&lt;</span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;&gt;</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span></code></pre></div><p>The REPL now has to depend on <code>ast</code>:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
+<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
+</code></pre></div><p>We can now run the REPL:</p><pre><code class=language-- data-lang=->$ cargo r -q
+→ let one = 1 let two = one + one
+# snip
+[
+    Some(
+        Literal(
+            Literal(
+                Literal@10..12
+                  Number@10..11 &quot;1&quot;
+                  Whitespace@11..12 &quot; &quot;
+                ,
+            ),
+        ),
+    ),
+    Some(
+        BinaryExpr(
+            BinaryExpr(
+                InfixExpr@22..32
+                  VariableRef@22..26
+                    Ident@22..25 &quot;one&quot;
+                    Whitespace@25..26 &quot; &quot;
+                  Plus@26..27 &quot;+&quot;
+                  Whitespace@27..28 &quot; &quot;
+                  VariableRef@28..32
+                    Ident@28..31 &quot;one&quot;
+                    Whitespace@31..32 &quot;\n&quot;
+                ,
+            ),
+        ),
+    ),
+]
+</code></pre><p>It’s extracted that <code>1</code> literal from the first variable, as well as the binary expression from the second variable.</p><p>Note how each of the two expressions our REPL is printing out is wrapped in a <code>Some</code> &ndash; this is because it’s possible for a variable definition to not have a value. Although this isn’t allowed by the language, it still happens because the parser recovers from the error and marches on. Let’s see if we get a <code>None</code> when we type in a variable definition that’s missing a value:</p><pre><code class=language-- data-lang=->→ let a = let b = 1 let c =
+# snip
+[
+    None,
+    Some(
+        Literal(
+            Literal(
+                Literal@16..18
+                  Number@16..17 &quot;1&quot;
+                  Whitespace@17..18 &quot; &quot;
+                ,
+            ),
+        ),
+    ),
+    None,
+]
+</code></pre><p>As expected, since the first and last variable definitions are missing values, we get <code>None</code>, <code>Some</code> and <code>None</code>.</p><h1 id=implementing-a-hir>Implementing a HIR</h1><p>Now that we have completed the implementation of a lossless AST, we can move on to implementing a HIR. In case you’ve forgotten, a HIR is a lowered, abstract representation of code that doesn’t include syntactic details and doesn’t have to match the input text exactly. As with the AST, we’ll start by letting Cargo generate a new crate for us:</p><pre><code class=language-- data-lang=->$ cargo new --lib crates/hir
+     Created library `crates/hir` package
+</code></pre><p>Let’s start with statements and variable definitions:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>name</span>: <span class=nc>SmolStr</span><span class=p>,</span><span class=w> </span><span class=n>value</span>: <span class=nc>Expr</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span><span class=p>),</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
+</code></pre></div><p>Next we’ll define <code>Expr</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w> </span><span class=n>lhs</span>: <span class=nc>Self</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span>: <span class=nc>Self</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=kt>u64</span> <span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>op</span>: <span class=nc>UnaryOp</span><span class=p>,</span><span class=w> </span><span class=n>expr</span>: <span class=nc>Self</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=nc>SmolStr</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>BinaryOp</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Add</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Sub</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Mul</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Div</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>UnaryOp</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Neg</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We now have the same problem as we had in <a href=/lang/8>Part Eight</a>; namely, we have a type that contains itself, and thus has an infinite size. We can fix this by wrapping all recursive usages of <code>Expr</code> in <code>Box</code>, which has a fixed size. This eliminates the recursion:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>lhs</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>rhs</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>n</span>: <span class=kt>u64</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>UnaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>expr</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>var</span>: <span class=nc>SmolStr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>This HIR is missing a critical component of our Rowan-based AST: the ability to represent incorrect parser inputs. We <em>could</em> represent the possibility of, say, a binary expression missing its right-hand side by wrapping <code>rhs</code> in an <code>Option</code>. We’d have to do this at every usage of <code>Expr</code>, though. Instead, we’ll add a <code>Missing</code> variant to <code>Expr</code>, so all usages of <code>Expr</code> are effectively optional:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Missing</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>There’s only one other part of the HIR that can be missing from the AST: <code>VariableDef</code>’s <code>name</code> field. A <code>VariableDef</code> node can be missing a name when the user has only typed the <code>let</code> keyword, since <code>let</code> is enough to trigger the creation of a <code>VariableDef</code>. In spite of this, we shouldn’t make <code>name</code> optional, because the HIR is used for features like type inference and IDE indexing that rely on the presence of names. If we made names optional, we’d have to handle the case where they don’t exist again and again.</p><p>Now that the HIR’s basic data structures are in place, we can implement lowering:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
+<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
+<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Stmt</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>name</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=o>?</span><span class=p>.</span><span class=n>text</span><span class=p>().</span><span class=n>clone</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>value</span>: <span class=nc>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>value</span><span class=p>()),</span><span class=w>
+</span><span class=w>            </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>))),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>ast</span>::<span class=n>Expr</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>lower_binary</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>parse</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>()),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>lower_unary</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Missing</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>BinaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>op</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Plus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Sub</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Star</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Slash</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Div</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>lhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>lhs</span><span class=p>())),</span><span class=w>
+</span><span class=w>            </span><span class=n>rhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>rhs</span><span class=p>())),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>UnaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>op</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>UnaryOp</span>::<span class=n>Neg</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expr</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>())),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>All that’s left to do for lowering is to write a <code>lower</code> function that takes the root of an AST, and lowers it to a <code>Vec&lt;Stmt></code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Root</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>impl</span><span class=w> </span><span class=nb>Iterator</span><span class=o>&lt;</span><span class=n>Item</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Stmt</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>ast</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>filter_map</span><span class=p>(</span><span class=n>Stmt</span>::<span class=n>lower</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s try lowering out by making the REPL print all HIR elements it can find in the input:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
+<span class=nx>hir</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../hir&#34;</span><span class=p>}</span>
+<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/main.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>()).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=cm>/* snip */</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>hir</span>::<span class=n>lower</span><span class=p>(</span><span class=n>root</span><span class=p>).</span><span class=n>collect</span>::<span class=o>&lt;</span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;&gt;</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo r -q
+→ let a = 10
+# snip
+[
+    VariableDef {
+        name: &quot;a&quot;,
+        value: Literal {
+            n: 10,
+        },
+    },
+]
+→ 5 + a * 100
+# snip
+[
+    Expr(
+        Binary {
+            op: Add,
+            lhs: Literal {
+                n: 5,
+            },
+            rhs: Binary {
+                op: Mul,
+                lhs: VariableRef {
+                    var: &quot;a&quot;,
+                },
+                rhs: Literal {
+                    n: 100,
+                },
+            },
+        },
+    ),
+]
+</code></pre><h1 id=migrating-to-an-arena>Migrating to an arena</h1><p>We currently use <code>Box</code> to add indirection where <code>Expr</code> recurses. Let’s take a look at the layout of <code>Expr</code> in memory:</p><p><img src=box.svg alt="A visualisation of Expr’s layout in memory"></p><p>Each of those arrows is a pointer to another location in memory, one that could be far away; there is a significant chance that the HIR elements are spread out across the heap. This is bad for performance, because it means the CPU can’t keep them all in the cache at the same time.</p><p>We can instead store each <code>Expr</code> in a <code>Vec</code>, and index into this <code>Vec</code> instead of using <code>Box</code>es to reference the subtrees. Here’s a visualisation of the same <code>Expr</code>’s memory layout with this setup:</p><p><img src=arena.svg alt="A visualisation of Expr’s memory layout when storing subtrees in a Vector"></p><p>Since <code>Vec</code>’s storage is contiguous, we know that each <code>Expr</code> will be right next to all the others, encouraging caching and increasing performance. A secondary benefit of this approach is that the indices into the <code>Vec</code> don’t necessarily have to be <code>usize</code>s &ndash; we could use <code>u32</code>s instead to save memory, since it’s unlikely we’ll have more than 2<sup>32</sup> &ndash; 1 = four billion <code>Expr</code> subtrees.</p><p>A <code>Vec</code> gives us too much control over the subtrees; all we want is to allocate another subtree, and get its index. Luckily, there is a data structure that does this job: the arena. There are <a href=https://docs.rs/typed-arena/>lots</a> <a href=https://docs.rs/id-arena>of</a> <a href=https://docs.rs/vec-arena>arena</a> <a href=https://docs.rs/slab>implementations</a> <a href=https://docs.rs/compact-arena>in</a> <a href=https://docs.rs/trove>Rust</a>. Each one that I have seen has more complexity than the basic <code>Vec</code>-like structure I described earlier. In some cases this is to allow the allocation of more than <code>usize::MAX</code> elements; in other cases the complexity allows removing elements one by one without invalidating existing indexes; in others still, it allows customisation of the index type (e.g. <code>usize</code>).</p><p>Let’s write our own, as-simple-as-possible arena implementation. We’ll start with a new crate:</p><pre><code class=language-- data-lang=->$ cargo new --lib crates/arena
+     Created library `crates/arena` package
+</code></pre><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/arena/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>data</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We need methods to create new arenas and to allocate values on the arena:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=nb>Default</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>default</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span>::<span class=n>new</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>data</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>()</span><span class=w> </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>alloc</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>t</span>: <span class=nc>T</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>usize</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>next_idx</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>t</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>idx</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>next_idx</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>usize</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We also need to allow indexing into the arena to retrieve values:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>ops</span>::<span class=n>Index</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Index</span><span class=o>&lt;</span><span class=kt>usize</span><span class=o>&gt;</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>type</span> <span class=nc>Output</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>T</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>index</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>idx</span>: <span class=kt>usize</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kp>&amp;</span><span class=nc>Self</span>::<span class=n>Output</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>[</span><span class=n>idx</span><span class=p>]</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s employ that index size optimisation from earlier, where we use <code>u32</code>s for indexes instead of <code>usize</code>s:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>alloc</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>t</span>: <span class=nc>T</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>u32</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>next_idx</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>t</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>idx</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>next_idx</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>u32</span> <span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>u32</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Index</span><span class=o>&lt;</span><span class=kt>u32</span><span class=o>&gt;</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>type</span> <span class=nc>Output</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>T</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>index</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>idx</span>: <span class=kt>u32</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kp>&amp;</span><span class=nc>Self</span>::<span class=n>Output</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>[</span><span class=n>idx</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>usize</span><span class=p>]</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We’ve created a new problem for ourselves by doing this, though: when reading code, <code>usize</code>s are often used as indexes, so we can be reasonably sure what their purpose is. However, now that we’re using <code>u32</code>s, it can get confusing &ndash; if you see</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// This is just an example; don’t write this!
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>struct</span> <span class=nc>BinaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>lhs</span>: <span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>rhs</span>: <span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>in a codebase, it isn’t clear what the usage of that <code>u32</code> looks like. We can alleviate this problem by wrapping the <code>u32</code> in a <a href=https://doc.rust-lang.org/rust-by-example/generics/new_types.html>newtype</a>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Idx</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>raw</span>: <span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We can replace all usages of <code>u32</code> with <code>Idx</code> and add a little bit of glue:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>alloc</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>t</span>: <span class=nc>T</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Idx</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>next_idx</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>t</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>idx</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>next_idx</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Idx</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Idx</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>raw</span>: <span class=nc>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Index</span><span class=o>&lt;</span><span class=n>Idx</span><span class=o>&gt;</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>type</span> <span class=nc>Output</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>T</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>index</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>idx</span>: <span class=nc>Idx</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kp>&amp;</span><span class=nc>Self</span>::<span class=n>Output</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>[</span><span class=n>idx</span><span class=p>.</span><span class=n>raw</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>usize</span><span class=p>]</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s take a look at that example from earlier again with this change:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// This is just an example; don’t write this!
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>struct</span> <span class=nc>BinaryExpr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>lhs</span>: <span class=nc>Idx</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>rhs</span>: <span class=nc>Idx</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>It’s <em>better,</em> but it’s still unclear. What type do you get as a result of indexing? Let’s add a type parameter to <code>Idx</code> to improve this further:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>raw</span>: <span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>_phantom</span>: <span class=nc>PhantomData</span><span class=o>&lt;</span><span class=k>fn</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>T</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p><a href=https://doc.rust-lang.org/stable/std/marker/struct.PhantomData.html><code>PhantomData</code></a> is a way of telling the Rust compiler that, although this type may not actually use the <code>T</code> type parameter, it still should have the parameter and shouldn’t have an ‘unused type parameter’ error. We don’t use <code>PhantomData&lt;T></code> in this case, because that communicates to the compiler that <code>Idx</code> <em>owns</em> a <code>T</code>, which can affect <a href=https://doc.rust-lang.org/nomicon/dropck.html>drop check</a>. <code>PhantomData&lt;fn() -> T></code> avoids this.</p><p>Let’s update all of <code>Idx</code>’s usages:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>alloc</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>t</span>: <span class=nc>T</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>next_idx</span><span class=p>();</span><span class=w>
+</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>t</span><span class=p>);</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>idx</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>next_idx</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>Idx</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>raw</span>: <span class=nc>self</span><span class=p>.</span><span class=n>data</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>u32</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_phantom</span>: <span class=nc>PhantomData</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=n>Index</span><span class=o>&lt;</span><span class=n>Idx</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;&gt;</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Arena</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>type</span> <span class=nc>Output</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>T</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>index</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>idx</span>: <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kp>&amp;</span><span class=nc>Self</span>::<span class=n>Output</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>data</span><span class=p>[</span><span class=n>idx</span><span class=p>.</span><span class=n>raw</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=kt>usize</span><span class=p>]</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Now that our arena implementation is complete, we can make use of it in the HIR:</p><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># crates/hir/Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>arena</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../arena&#34;</span><span class=p>}</span>
+<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
+<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
+<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+</code></pre></div><p>The first thing we need is a type to store the arena:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>database</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>database</span>::<span class=n>Database</span><span class=p>;</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/database.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>Expr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>arena</span>::<span class=n>Arena</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug, Default)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Database</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>exprs</span>: <span class=nc>Arena</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Let’s replace <code>Box&lt;Expr></code> with <code>Idx&lt;Expr></code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>arena</span>::<span class=n>Idx</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Missing</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>lhs</span>: <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>rhs</span>: <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>n</span>: <span class=kt>u64</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>UnaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>expr</span>: <span class=nc>Idx</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>var</span>: <span class=nc>SmolStr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We can make this a little cleaner by creating a type alias for <code>Idx&lt;Expr></code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>type</span> <span class=nc>ExprIdx</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Idx</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=n>Missing</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>BinaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>lhs</span>: <span class=nc>ExprIdx</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>rhs</span>: <span class=nc>ExprIdx</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>n</span>: <span class=kt>u64</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>op</span>: <span class=nc>UnaryOp</span><span class=p>,</span><span class=w>
+</span><span class=w>        </span><span class=n>expr</span>: <span class=nc>ExprIdx</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w>    </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=n>var</span>: <span class=nc>SmolStr</span><span class=p>,</span><span class=w>
+</span><span class=w>    </span><span class=p>},</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>All the lowering methods need to take a <code>&mut Database</code> as a parameter:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Stmt</span><span class=p>,</span><span class=w> </span><span class=n>db</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Database</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>name</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=o>?</span><span class=p>.</span><span class=n>text</span><span class=p>().</span><span class=n>clone</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>value</span>: <span class=nc>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>value</span><span class=p>(),</span><span class=w> </span><span class=n>db</span><span class=p>),</span><span class=w>
+</span><span class=w>            </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w> </span><span class=n>db</span><span class=p>)),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>ast</span>::<span class=n>Expr</span><span class=o>&gt;</span><span class=p>,</span><span class=w> </span><span class=n>db</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Database</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>lower_binary</span><span class=p>(</span><span class=n>ast</span><span class=p>,</span><span class=w> </span><span class=n>db</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>(),</span><span class=w> </span><span class=n>db</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>lower_unary</span><span class=p>(</span><span class=n>ast</span><span class=p>,</span><span class=w> </span><span class=n>db</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>BinaryExpr</span><span class=p>,</span><span class=w> </span><span class=n>db</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Database</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>lhs</span>: <span class=nc>db</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>lhs</span><span class=p>(),</span><span class=w> </span><span class=n>db</span><span class=p>)),</span><span class=w>
+</span><span class=w>            </span><span class=n>rhs</span>: <span class=nc>db</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>rhs</span><span class=p>(),</span><span class=w> </span><span class=n>db</span><span class=p>)),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>UnaryExpr</span><span class=p>,</span><span class=w> </span><span class=n>db</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Database</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=n>Self</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expr</span>: <span class=nc>db</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>(),</span><span class=w> </span><span class=n>db</span><span class=p>)),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We’ve got a code smell here: we’re threading the same value through each and every method. This is a sign that these methods should be <code>impl</code>ed on the type of that value, which in this case is <code>&mut Database</code>. Let’s change the lowering code to be methods on <code>Database</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// database.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>BinaryOp</span><span class=p>,</span><span class=w> </span><span class=n>Expr</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span><span class=p>,</span><span class=w> </span><span class=n>UnaryOp</span><span class=p>};</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>arena</span>::<span class=n>Arena</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower_stmt</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Stmt</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Stmt</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>name</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=o>?</span><span class=p>.</span><span class=n>text</span><span class=p>().</span><span class=n>clone</span><span class=p>(),</span><span class=w>
+</span><span class=w>                </span><span class=n>value</span>: <span class=nc>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>value</span><span class=p>()),</span><span class=w>
+</span><span class=w>            </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>))),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower_expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>ast</span>::<span class=n>Expr</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_binary</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>parse</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>()),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_unary</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w>
+</span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
+</span><span class=w>            </span><span class=p>}</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>Missing</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>BinaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>op</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Plus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Sub</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Star</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Slash</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>BinaryOp</span>::<span class=n>Div</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>lhs</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>lhs</span><span class=p>())),</span><span class=w>
+</span><span class=w>            </span><span class=n>rhs</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>rhs</span><span class=p>())),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>UnaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>op</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>UnaryOp</span>::<span class=n>Neg</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
+</span><span class=w>        </span><span class=p>};</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expr</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>())),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Finally, we need to update <code>hir::lower</code> to call <code>Database::lower_stmt</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Root</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=n>Database</span><span class=p>,</span><span class=w> </span><span class=k>impl</span><span class=w> </span><span class=nb>Iterator</span><span class=o>&lt;</span><span class=n>Item</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Stmt</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>db</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>(</span><span class=n>db</span><span class=p>,</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>filter_map</span><span class=p>(</span><span class=o>|</span><span class=n>stmt</span><span class=o>|</span><span class=w> </span><span class=n>db</span><span class=p>.</span><span class=n>lower_stmt</span><span class=p>(</span><span class=n>stmt</span><span class=p>)))</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Note how we return the database so that the user of the function can use the otherwise-opaque arena indexes. This function doesn’t compile though, because returning the iterator means that the closure passed to <code>filter_map</code> won’t be run until the caller decides to consume the iterator. Rust can’t verify that <code>db</code> will still be alive when the closure is run, so it gives us an error. We can fix this by collecting the iterator to a <code>Vec</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower</span><span class=p>(</span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Root</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=n>Database</span><span class=p>,</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Stmt</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>db</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stmts</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>filter_map</span><span class=p>(</span><span class=o>|</span><span class=n>stmt</span><span class=o>|</span><span class=w> </span><span class=n>db</span><span class=p>.</span><span class=n>lower_stmt</span><span class=p>(</span><span class=n>stmt</span><span class=p>)).</span><span class=n>collect</span><span class=p>();</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=p>(</span><span class=n>db</span><span class=p>,</span><span class=w> </span><span class=n>stmts</span><span class=p>)</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>Next, we have several errors caused by borrowing mutably more than once at a time. These can be fixed by extracting the first mutable borrows to temporary variables:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// database.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>BinaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>lhs</span><span class=p>());</span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>rhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>rhs</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>lhs</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>lhs</span><span class=p>),</span><span class=w>
+</span><span class=w>            </span><span class=n>rhs</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>rhs</span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>UnaryExpr</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>expr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>expr</span><span class=p>());</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>            </span><span class=n>op</span><span class=p>,</span><span class=w>
+</span><span class=w>            </span><span class=n>expr</span>: <span class=nc>self</span><span class=p>.</span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>expr</span><span class=p>),</span><span class=w>
+</span><span class=w>        </span><span class=p>}</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span><span class=w>
+</span></code></pre></div><p>The last remaining error stems from us trying to <code>collect</code> the result of <code>hir::lower</code> in the REPL. Let’s remove this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/main.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>    </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
+</span><span class=w>        </span><span class=c1>// snip
+</span><span class=c1></span><span class=w>
+</span><span class=w>        </span><span class=n>dbg</span><span class=o>!</span><span class=p>(</span><span class=n>hir</span>::<span class=n>lower</span><span class=p>(</span><span class=n>root</span><span class=p>));</span><span class=w>
+</span><span class=w>
+</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
+</span><span class=w>    </span><span class=p>}</span><span class=w>
+</span><span class=w></span><span class=p>}</span><span class=w>
+</span></code></pre></div><p>We also have an unused import that we should delete:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>database</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>database</span>::<span class=n>Database</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>arena</span>::<span class=n>Idx</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>The arena we’ve created is very similar to la-arena, <a href=https://github.com/rust-analyzer/rust-analyzer/blob/cd532e615abdac766ce9110e02e197f674fce375/lib/arena/src/lib.rs>the arena used in rust-analyzer</a>, which is <a href=https://crates.io/crates/la-arena>published on crates.io</a>. In fact, la-arena’s implementation is essentially the same as ours, with a few more bells and whistles.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup> Let’s delete our implementation, and use la-arena instead:</p><pre><code class=language-- data-lang=->$ rm -r crates/arena
+</code></pre><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+
+<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
+<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
+<span class=nx>la</span><span class=err>-</span><span class=nx>arena</span> <span class=p>=</span> <span class=s2>&#34;0.2.0&#34;</span>
+<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
+<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+</code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>mod</span> <span class=nn>database</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>database</span>::<span class=n>Database</span><span class=p>;</span><span class=w>
+</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>la_arena</span>::<span class=n>Idx</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>smol_str</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
+</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// database.rs
+</span><span class=c1></span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>BinaryOp</span><span class=p>,</span><span class=w> </span><span class=n>Expr</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span><span class=p>,</span><span class=w> </span><span class=n>UnaryOp</span><span class=p>};</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>la_arena</span>::<span class=n>Arena</span><span class=p>;</span><span class=w>
+</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span></code></pre></div><h1 id=conclusion>Conclusion</h1><p>I hope you’re enjoying the series; the next part will be a shorter one focusing on tests.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>An example here is Expand Selection. <a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>la-arena has more methods (such as <code>len</code> and <code>iter</code>), allows the creation of arbitrary <code>Idx</code> values, and has a customised <code>Debug</code> implementation that is easier to read. <a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=prev-and-next><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/18/>Part Eighteen: Errors</a></div><div style=clear:both></div></nav></body></html>
