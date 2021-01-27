@@ -2,7 +2,10 @@
 arzg’s website</title><link>https://arzg.github.io/</link><description>
 Recent content
 in Home
-on arzg’s website</description><generator>Hugo -- gohugo.io</generator><language>en-uk</language><atom:link href="https://arzg.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Part Nineteen: Code Representations</title><link>https://arzg.github.io/lang/19/</link><pubDate>
+on arzg’s website</description><generator>Hugo -- gohugo.io</generator><language>en-uk</language><atom:link href="https://arzg.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Part Twenty: Testing</title><link>https://arzg.github.io/lang/20/</link><pubDate>
+Wed, 27 Jan 2021 00:00:00 +0000</pubDate><guid>https://arzg.github.io/lang/20/</guid><description>
+I was disciplined with my TDD throughout the early parts of this series &amp;ndash; I think this was helpful. Unfortunately, testing has fallen by the wayside in some recent parts; especially the last one. I would like to get back into the habit of TDD, and so I should add tests to areas of the codebase that are missing them.
+A weird compilation failure First off, a small erratum: it turns out that Eldiro fails to compile when the entire workspace’s tests are run:</description></item><item><title>Part Nineteen: Code Representations</title><link>https://arzg.github.io/lang/19/</link><pubDate>
 Fri, 24 Jan 2020 00:00:00 +0000</pubDate><guid>https://arzg.github.io/lang/19/</guid><description>
 So far we have only used two different data structures to represent code:
 abstract syntax trees concrete syntax trees An abstract syntax tree is a data structure that represents the bare minimum about a chunk of code. We used ASTs in the early parts of this series prior to the Rowan rewrite. For example, here’s an AST that represents variable definitions:
