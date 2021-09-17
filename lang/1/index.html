@@ -1,11 +1,54 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part One: A Basic Parser · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script><script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part One: A Basic Parser</h1><section class=page-info><ul><li>8 September 2020</li><li>1438 words</li><li>seven minute read</li></ul></section></header><main><p>The most fundamental part of any language is the parser<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> &ndash; a piece of software whose purpose is to take a flat structure (usually text in some form) and convert it into a tree structure. In this post, we’ll make a parser for mathematical expressions that don’t contain nesting. For example, <code>1 + 1</code> is allowed, but <code>2 * 3 + 4</code> isn’t (because that’s shorthand for <code>(2 * 3) + 4</code>, and thus contains nesting). I’ve chosen to keep it this simple so that we don’t need to worry about order of operations.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p><p>Let’s think about the problem: the only two elements that are allowed in our expressions are numbers and operators. If we can make a parser for numbers and a parser for operators, we’ll be well on our way to finishing the first incarnation of our parser.</p><h1 id=a-parser-for-numbers>A parser for numbers</h1><p>As we’re good test-driven developers, we’ll start by writing a test. First, we open <code>src/lib.rs</code> and are greeted by this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+<!doctype html><html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Part One: A Basic Parser · arzg’s website</title>
+<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
+<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
+<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
+<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
+<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
+<link rel=manifest href=/site.webmanifest>
+</head>
+<body>
+<nav class=site-navigation>
+<ul>
+<li>
+<a href=/>Home</a>
+</li>
+<li>
+<a href=/blog/>Blog</a>
+</li>
+<li class=current>
+<a href=/lang/>Make A Language</a>
+</li>
+</ul>
+</nav>
+<header class=header-area>
+<h1 class=title>Part One: A Basic Parser</h1>
+<section class=page-info>
+<ul>
+<li>8 September 2020</li>
+<li>1438 words</li>
+<li>seven minute read</li>
+</ul>
+</section>
+</header>
+<main><p>The most fundamental part of any language is the parser<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> &ndash; a piece of software whose purpose is to take a flat structure (usually text in some form) and convert it into a tree structure. In this post, we’ll make a parser for mathematical expressions that don’t contain nesting. For example, <code>1 + 1</code> is allowed, but <code>2 * 3 + 4</code> isn’t (because that’s shorthand for <code>(2 * 3) + 4</code>, and thus contains nesting). I’ve chosen to keep it this simple so that we don’t need to worry about order of operations.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p>
+<p>Let’s think about the problem: the only two elements that are allowed in our expressions are numbers and operators. If we can make a parser for numbers and a parser for operators, we’ll be well on our way to finishing the first incarnation of our parser.</p>
+<h1 id=a-parser-for-numbers>A parser for numbers</h1>
+<p>As we’re good test-driven developers, we’ll start by writing a test. First, we open <code>src/lib.rs</code> and are greeted by this:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>it_works</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=mi>2</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=mi>2</span><span class=p>,</span><span class=w> </span><span class=mi>4</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s remove the <code>it_works</code> test, and change it to a test that checks if we can parse numbers:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s remove the <code>it_works</code> test, and change it to a test that checks if we can parse numbers:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -14,18 +57,21 @@
 </span><span class=w>      </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;123&#34;</span><span class=p>),</span><span class=w> </span><span class=n>Number</span><span class=p>(</span><span class=mi>123</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s follow TDD some more: what’s the shortest thing we can write that makes this pass? Well, first, we need to make it compile.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>Let’s follow TDD some more: what’s the shortest thing we can write that makes this pass? Well, first, we need to make it compile.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Number</span><span class=p>(</span><span class=k>pub</span><span class=w> </span><span class=kt>i32</span><span class=p>);</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Number</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This still doesn’t compile, because <code>new</code> doesn’t return anything. Well, the easiest thing we can do is use the <code>parse</code> method on <code>str</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Number</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>This still doesn’t compile, because <code>new</code> doesn’t return anything. Well, the easiest thing we can do is use the <code>parse</code> method on <code>str</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Number</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>Self</span><span class=p>(</span><span class=n>s</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>unwrap</span><span class=p>())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now it compiles! Let’s see if the tests pass:</p><pre><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>Now it compiles! Let’s see if the tests pass:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t
    Compiling eldiro v0.1.0 (/home/me/src/eldiro)
     Finished test [unoptimized + debuginfo] target(s) in 0.14s
      Running /home/me/.cache/cargo-target/debug/deps/eldiro-4b82c3c57a78933f
@@ -38,7 +84,10 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
    Doc-tests eldiro
 
 running 0 tests
-</code></pre><p>Hooray, it works!</p><h1 id=a-parser-for-operators>A parser for operators</h1><p>We’ll start by writing tests for addition, subtraction, multiplication and division:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Hooray, it works!</p>
+<h1 id=a-parser-for-operators>A parser for operators</h1>
+<p>We’ll start by writing tests for addition, subtraction, multiplication and division:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -62,14 +111,16 @@ running 0 tests
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>Op</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;/&#34;</span><span class=p>),</span><span class=w> </span><span class=n>Op</span>::<span class=n>Div</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p><code>Op</code> is undefined, so let’s declare that:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p><code>Op</code> is undefined, so let’s declare that:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Op</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Add</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>Sub</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>Mul</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>Div</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now the only remaining compile error is that <code>Op::new</code> doesn’t exist:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Op</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Now the only remaining compile error is that <code>Op::new</code> doesn’t exist:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Op</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>            </span><span class=s>&#34;+&#34;</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
@@ -80,7 +131,8 @@ running 0 tests
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Instead of handling the case where we’ve been given a non-existent operator, we just crash the program. Obviously this is far from ideal, but we’re keeping it really simple at the moment.</p><pre><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>Instead of handling the case where we’ve been given a non-existent operator, we just crash the program. Obviously this is far from ideal, but we’re keeping it really simple at the moment.</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t
 // snip
 running 5 tests
 test tests::parse_add_op ... ok
@@ -91,7 +143,10 @@ test tests::parse_number ... ok
 
 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 // doc-test stuff that we’re not interested in
-</code></pre><p>Nice! We’ve now got the ingredients we need to parse our ultra-simplified mathematical expressions.</p><h1 id=putting-it-all-together>Putting it all together</h1><p>As usual, we’ll write a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Nice! We’ve now got the ingredients we need to parse our ultra-simplified mathematical expressions.</p>
+<h1 id=putting-it-all-together>Putting it all together</h1>
+<p>As usual, we’ll write a test:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -107,13 +162,16 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>In case you’re not familiar with the jargon, <code>Expr</code> is a common shorthand for <code>Expression</code>, <code>lhs</code> is short for left-hand side, and, shockingly, <code>rhs</code> stands for right-hand side.</p><p><code>Expr</code> will be the type that holds the structure of what an expression actually <em>is</em> in Eldiro. Since we don’t support nesting, <code>Expr</code>’s definition is straightforward:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>In case you’re not familiar with the jargon, <code>Expr</code> is a common shorthand for <code>Expression</code>, <code>lhs</code> is short for left-hand side, and, shockingly, <code>rhs</code> stands for right-hand side.</p>
+<p><code>Expr</code> will be the type that holds the structure of what an expression actually <em>is</em> in Eldiro. Since we don’t support nesting, <code>Expr</code>’s definition is straightforward:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>lhs</span>: <span class=nc>Number</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>rhs</span>: <span class=nc>Number</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>op</span>: <span class=nc>Op</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s tentatively define the <code>new</code> method:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s tentatively define the <code>new</code> method:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>rhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
@@ -122,7 +180,8 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This won’t work, though, because we’re trying to parse the left-hand side (as well as the right-hand side and the operator) from the <em>entire</em> input, when in reality parsing the left-hand side only needs to look at a small portion at the start of the input. The same goes for the right-hand side and the operator, too. Let’s run the tests to see if we’re correct:</p><pre><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>This won’t work, though, because we’re trying to parse the left-hand side (as well as the right-hand side and the operator) from the <em>entire</em> input, when in reality parsing the left-hand side only needs to look at a small portion at the start of the input. The same goes for the right-hand side and the operator, too. Let’s run the tests to see if we’re correct:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t
 running 6 tests
 test tests::parse_add_op ... ok
 test tests::parse_div_op ... ok
@@ -135,11 +194,15 @@ failures:
 
 ---- tests::parse_one_plus_two stdout ----
 thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }', src/lib.rs:6:24
-</code></pre><p>And sure enough, the test fails. Hmm …</p><p>So, what we need to do is … extract the numbers at the start of the input? Something like this:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extractor_thing</span><span class=p>(</span><span class=s>&#34;1+2&#34;</span><span class=p>),</span><span class=w> </span><span class=s>&#34;1&#34;</span><span class=p>);</span><span class=w>
-</span></code></pre></div><p>Well, if we’ve now got the left-hand side as its own <code>&str</code>, we need some way to get the operator. I mean, if we just scanned past the left-hand side, why don’t we continue from where we left off? To do that, <code>extractor_thing</code> will have to return a pair of the part of the input it extracted, as well as the leftovers:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>//                       extracted portion ╮
+</code></pre><p>And sure enough, the test fails. Hmm …</p>
+<p>So, what we need to do is … extract the numbers at the start of the input? Something like this:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extractor_thing</span><span class=p>(</span><span class=s>&#34;1+2&#34;</span><span class=p>),</span><span class=w> </span><span class=s>&#34;1&#34;</span><span class=p>);</span><span class=w>
+</span></code></pre></div><p>Well, if we’ve now got the left-hand side as its own <code>&str</code>, we need some way to get the operator. I mean, if we just scanned past the left-hand side, why don’t we continue from where we left off? To do that, <code>extractor_thing</code> will have to return a pair of the part of the input it extracted, as well as the leftovers:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>//                       extracted portion ╮
 </span><span class=c1>//                          leftover ╮     │
 </span><span class=c1></span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extractor_thing</span><span class=p>(</span><span class=s>&#34;1+2&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;+2&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;1&#34;</span><span class=p>));</span><span class=w>
-</span></code></pre></div><p>Let’s get started on writing this <code>extractor_thing</code> in a new module called <code>utils</code>. Create the file <code>src/utils.rs</code> and add <code>mod utils;</code> to the top of <code>lib.rs</code>.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
+</span></code></pre></div><p>Let’s get started on writing this <code>extractor_thing</code> in a new module called <code>utils</code>. Create the file <code>src/utils.rs</code> and add <code>mod utils;</code> to the top of <code>lib.rs</code>.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=p>(</span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=mi>1</span><span class=p>..],</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=mi>0</span><span class=p>..</span><span class=mi>1</span><span class=p>])</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
@@ -153,7 +216,8 @@ thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an 
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_digits</span><span class=p>(</span><span class=s>&#34;1+2&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;+2&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;1&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Well, the tests <em>pass,</em> but we’re not thinking ahead; what if the number is more than one digit long?</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Well, the tests <em>pass,</em> but we’re not thinking ahead; what if the number is more than one digit long?</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>digits_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>0</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -183,7 +247,8 @@ thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an 
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_digits</span><span class=p>(</span><span class=s>&#34;10-20&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;-20&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;10&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This works, but isn’t very idiomatic, with that <code>for</code> loop and <code>mut</code>ation. Let’s rewrite it to use iterator adaptors:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>This works, but isn’t very idiomatic, with that <code>for</code> loop and <code>mut</code>ation. Let’s rewrite it to use iterator adaptors:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>digits_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>find_map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>c</span><span class=p>.</span><span class=n>is_ascii_digit</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>None</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span><span class=w> </span><span class=p>})</span><span class=w>
@@ -193,7 +258,8 @@ thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an 
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>digits_end</span><span class=p>..];</span><span class=w>
 </span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>digits</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What we’re doing here is looking at all the characters (and their respective indices) in <code>s</code> &ndash; if the character is an ASCII digit (i.e. anywhere from <code>0</code> to <code>9</code>) we move onto the next one. However, if the character isn’t an ASCII digit, we stop there and return the index of that character. On the off-chance that we never encounter a non-digit character, the index where the digits end is the length of the input (as the entire input consists of digits). We should probably add some tests to verify that:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>What we’re doing here is looking at all the characters (and their respective indices) in <code>s</code> &ndash; if the character is an ASCII digit (i.e. anywhere from <code>0</code> to <code>9</code>) we move onto the next one. However, if the character isn’t an ASCII digit, we stop there and return the index of that character. On the off-chance that we never encounter a non-digit character, the index where the digits end is the length of the input (as the entire input consists of digits). We should probably add some tests to verify that:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -207,7 +273,8 @@ thread 'tests::parse_one_plus_two' panicked at 'called `Result::unwrap()` on an 
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_digits</span><span class=p>(</span><span class=s>&#34;100&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;100&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And, indeed, that does work:</p><pre><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>And, indeed, that does work:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t
 running 9 tests
 test tests::parse_add_op ... ok
 test tests::parse_number ... ok
@@ -219,7 +286,9 @@ test utils::tests::extract_multiple_digits ... ok
 test utils::tests::extract_one_digit ... ok
 test utils::tests::extract_digits_with_no_remainder ... ok
 test tests::parse_one_plus_two ... FAILED
-</code></pre><p>Huh, what’s that failed test there? Oh, right, we were trying to parse <code>"1+2"</code>.</p><p>Remember this?</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</code></pre><p>Huh, what’s that failed test there? Oh, right, we were trying to parse <code>"1+2"</code>.</p>
+<p>Remember this?</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
@@ -229,7 +298,8 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s convert it to use our new <code>extract_digits</code> function:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s convert it to use our new <code>extract_digits</code> function:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>lhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_digits</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>lhs</span><span class=p>);</span><span class=w>
@@ -243,7 +313,8 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This won’t do, this won’t do at all! Not only are we parsing the operator <em>after</em> the right-hand side (even though it should come before), but we also haven’t applied the extraction logic we used for numbers to parsing operators. I guess we should head back to <code>utils.rs</code> and write up another function.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_op</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>This won’t do, this won’t do at all! Not only are we parsing the operator <em>after</em> the right-hand side (even though it should come before), but we also haven’t applied the extraction logic we used for numbers to parsing operators. I guess we should head back to <code>utils.rs</code> and write up another function.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_op</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=mi>0</span><span class=p>..</span><span class=mi>1</span><span class=p>]</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=s>&#34;+&#34;</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=s>&#34;-&#34;</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=s>&#34;*&#34;</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=s>&#34;/&#34;</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
 </span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>panic</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;bad operator&#34;</span><span class=p>),</span><span class=w>
@@ -276,7 +347,8 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_op</span><span class=p>(</span><span class=s>&#34;/4&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;4&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;/&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s apply this in <code>Expr::new</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s apply this in <code>Expr::new</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>lhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_digits</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>lhs</span><span class=p>);</span><span class=w>
@@ -290,7 +362,9 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Every time we extract something from the input, we declare a new binding with the same name as the initial input <code>s</code> so that everything we do with <code>s</code> afterwards doesn’t include the part we ‘consumed’.</p><p>Really, though, shouldn’t <code>Number::new</code> and <code>Op::new</code> handle extracting the relevant text from the input themselves? Let’s update the tests:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Every time we extract something from the input, we declare a new binding with the same name as the initial input <code>s</code> so that everything we do with <code>s</code> afterwards doesn’t include the part we ‘consumed’.</p>
+<p>Really, though, shouldn’t <code>Number::new</code> and <code>Op::new</code> handle extracting the relevant text from the input themselves? Let’s update the tests:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -319,7 +393,9 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>Op</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;/&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w> </span><span class=n>Op</span>::<span class=n>Div</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Since all our tests completely consume their inputs, there’s never any leftover input. To represent this, we’ve wrapped the expected output of each parser in a tuple where the first item is an empty string literal.</p><p>Let’s update all our parsers to independently extract text from the input:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Number</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Since all our tests completely consume their inputs, there’s never any leftover input. To represent this, we’ve wrapped the expected output of each parser in a tuple where the first item is an empty string literal.</p>
+<p>Let’s update all our parsers to independently extract text from the input:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Number</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>number</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_digits</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>(</span><span class=n>number</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>unwrap</span><span class=p>()))</span><span class=w>
@@ -355,7 +431,8 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Look at how clean <code>Expr::new</code> is now! But we still have one problem: what if <code>Expr::new</code> doesn’t fully consume its input? Let’s make <code>Expr::new</code> return a <code>(&str, Self)</code> like all the other parsers:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Look at how clean <code>Expr::new</code> is now! But we still have one problem: what if <code>Expr::new</code> doesn’t fully consume its input? Let’s make <code>Expr::new</code> return a <code>(&str, Self)</code> like all the other parsers:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>lhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Number</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Op</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
@@ -386,7 +463,8 @@ test tests::parse_one_plus_two ... FAILED
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s finish off this instalment of <em>Make A Language</em> by basking in the glory of a passing test suite.</p><pre><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>Let’s finish off this instalment of <em>Make A Language</em> by basking in the glory of a passing test suite.</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t
    Compiling eldiro v0.1.0 (/home/me/src/eldiro)
     Finished test [unoptimized + debuginfo] target(s) in 0.46s
      Running /home/me/.cache/cargo-target/debug/deps/eldiro-4b82c3c57a78933f
@@ -414,4 +492,29 @@ test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Beautiful! Next time, we’ll add support for whitespace.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>For most languages it’s actually the lexer, but we’ll worry about that when we improve the parser in a future post.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>If you <em>really</em> want to learn about operator precedence and how you can handle it in a parser, take a look at <a href=https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>this great article</a>. Yet again, I will only cover this topic once we’ve rewritten the parser.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/0/>Part Zero: Getting set up</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/2/>Part Two: Whitespace Support</a></div><div style=clear:both></div></nav></body></html>
+</code></pre><p>Beautiful! Next time, we’ll add support for whitespace.</p>
+<section class=footnotes role=doc-endnotes>
+<hr>
+<ol>
+<li id=fn:1 role=doc-endnote>
+<p>For most languages it’s actually the lexer, but we’ll worry about that when we improve the parser in a future post.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+<li id=fn:2 role=doc-endnote>
+<p>If you <em>really</em> want to learn about operator precedence and how you can handle it in a parser, take a look at <a href=https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>this great article</a>. Yet again, I will only cover this topic once we’ve rewritten the parser.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</main>
+<nav class=page-navigation>
+<div class=prev>
+<p class=hint>Previously</p>
+<a href=https://arzg.github.io/lang/0/>Part Zero: Getting set up</a>
+</div>
+<div class=next>
+<p class=hint>Next up</p>
+<a href=https://arzg.github.io/lang/2/>Part Two: Whitespace Support</a>
+</div>
+<div style=clear:both></div>
+</nav>
+</body>
+</html>

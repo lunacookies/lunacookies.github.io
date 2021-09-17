@@ -1,16 +1,65 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Eighteen: Errors · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script><script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Eighteen: Errors</h1><section class=page-info><ul><li>21 December 2020</li><li>4301 words</li><li>22 minute read</li></ul></section></header><main><p>So far, our parser has only concerned itself with input that is correct. In a world of IDEs and language servers, however, the input to our parser will be wrong more often than not. Therefore, it is important that our parser can:</p><ul><li>recover gracefully from errors</li><li>infer as detailed a syntax tree from the input as possible</li><li>report errors in a user-friendly manner</li></ul><p>Unfortunately for us, the only thing our parser currently supports is arithmetic expressions, which don’t make error recovery techniques easy to demonstrate. Let’s first implement a parser for variable definitions.</p><h1 id=variable-definitions>Variable definitions</h1><p>Since variable definitions aren’t expressions, we shouldn’t put them in the <code>expr</code> module. Let’s create a new <code>stmt</code> module for statements:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
+<!doctype html><html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Part Eighteen: Errors · arzg’s website</title>
+<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
+<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
+<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
+<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
+<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
+<link rel=manifest href=/site.webmanifest>
+</head>
+<body>
+<nav class=site-navigation>
+<ul>
+<li>
+<a href=/>Home</a>
+</li>
+<li>
+<a href=/blog/>Blog</a>
+</li>
+<li class=current>
+<a href=/lang/>Make A Language</a>
+</li>
+</ul>
+</nav>
+<header class=header-area>
+<h1 class=title>Part Eighteen: Errors</h1>
+<section class=page-info>
+<ul>
+<li>21 December 2020</li>
+<li>4301 words</li>
+<li>22 minute read</li>
+</ul>
+</section>
+</header>
+<main><p>So far, our parser has only concerned itself with input that is correct. In a world of IDEs and language servers, however, the input to our parser will be wrong more often than not. Therefore, it is important that our parser can:</p>
+<ul>
+<li>recover gracefully from errors</li>
+<li>infer as detailed a syntax tree from the input as possible</li>
+<li>report errors in a user-friendly manner</li>
+</ul>
+<p>Unfortunately for us, the only thing our parser currently supports is arithmetic expressions, which don’t make error recovery techniques easy to demonstrate. Let’s first implement a parser for variable definitions.</p>
+<h1 id=variable-definitions>Variable definitions</h1>
+<p>Since variable definitions aren’t expressions, we shouldn’t put them in the <code>expr</code> module. Let’s create a new <code>stmt</code> module for statements:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>stmt</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/grammar/stmt.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/grammar/stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>todo</span><span class=o>!</span><span class=p>()</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’ll use the same syntax for variable definitions as we used before the rewrite:</p><pre><code>let name = expr
-</code></pre><p>A test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>We’ll use the same syntax for variable definitions as we used before the rewrite:</p>
+<pre tabindex=0><code>let name = expr
+</code></pre><p>A test:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>check</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=n>expect_test</span>::<span class=n>expect</span><span class=p>;</span><span class=w>
@@ -33,7 +82,8 @@
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now implement parsing of variable definitions:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We can now implement parsing of variable definitions:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LetKw</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>variable_def</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
 </span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=nb>None</span><span class=p>,</span><span class=w>
@@ -55,7 +105,9 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableDef</span><span class=p>))</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Instead of handling errors, we repeatedly <code>assert</code> the token we’re at; since we know at that point the token we’re at, we can just <code>bump</code> past it.</p><p>Let’s quickly define <code>SyntaxKind::VariableDef</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
+</span></code></pre></div><p>Instead of handling errors, we repeatedly <code>assert</code> the token we’re at; since we know at that point the token we’re at, we can just <code>bump</code> past it.</p>
+<p>Let’s quickly define <code>SyntaxKind::VariableDef</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive, ToPrimitive)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -68,7 +120,8 @@
 </span><span class=w>    </span><span class=n>VariableDef</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>VariableRef</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Our parser compiles, but we get a failing test because <code>root</code> doesn’t use <code>stmt</code>. The solution is to have <code>stmt</code> fall back to calling <code>expr</code> if it isn’t sure what it’s looking at:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/grammar/stmt.rs
+</span></code></pre></div><p>Our parser compiles, but we get a failing test because <code>root</code> doesn’t use <code>stmt</code>. The solution is to have <code>stmt</code> fall back to calling <code>expr</code> if it isn’t sure what it’s looking at:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/grammar/stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -76,7 +129,8 @@
 </span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now call <code>stmt</code> from <code>root</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
+</span></code></pre></div><p>We can now call <code>stmt</code> from <code>root</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>root</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
@@ -84,7 +138,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -104,7 +158,8 @@ failures:
     grammar::stmt::tests::parse_variable_definition
 
 test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>What seems to have happened is that <code>expr</code> has returned <code>None</code>, causing <code>variable_def</code> to return early, which in turn means the marker isn’t completed. Since we don’t care about error handling yet, we can add an <code>unwrap</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</code></pre><p>What seems to have happened is that <code>expr</code> has returned <code>None</code>, causing <code>variable_def</code> to return early, which in turn means the marker isn’t completed. Since we don’t care about error handling yet, we can add an <code>unwrap</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -128,7 +183,7 @@ test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableDef</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -148,7 +203,9 @@ failures:
     grammar::stmt::tests::parse_variable_definition
 
 test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Huh, that’s weird; why is <code>expr</code> returning <code>None</code>? The only places where it can do so are <code>let lhs = lhs()?;</code> and if it doesn’t see an operator. Oh, <em>wait.</em></p><p>We should be returning <code>lhs</code> at that point instead:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Huh, that’s weird; why is <code>expr</code> returning <code>None</code>? The only places where it can do so are <code>let lhs = lhs()?;</code> and if it doesn’t see an operator. Oh, <em>wait.</em></p>
+<p>We should be returning <code>lhs</code> at that point instead:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w> </span><span class=c1>// we’ll handle errors later.
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -162,7 +219,7 @@ test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -172,28 +229,46 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 18 tests
 ..................
 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=a-short-intermission>A short intermission</h1><p>Let’s say the parser is being used as part of a language server, and the user has typed out a variable definition:</p><pre><code>let b = a
-</code></pre><p>They realise they haven’t defined <code>a</code>, so they define it above:</p><pre><code>let a = 10
+</code></pre><h1 id=a-short-intermission>A short intermission</h1>
+<p>Let’s say the parser is being used as part of a language server, and the user has typed out a variable definition:</p>
+<pre tabindex=0><code>let b = a
+</code></pre><p>They realise they haven’t defined <code>a</code>, so they define it above:</p>
+<pre tabindex=0><code>let a = 10
 let b = a
-</code></pre><p>While the user is in the middle of typing that, our parser sees this:</p><pre><code>let a =
+</code></pre><p>While the user is in the middle of typing that, our parser sees this:</p>
+<pre tabindex=0><code>let a =
 let b = a
-</code></pre><p>What we want is for our parser to recognise two variable definitions, with the first missing an expression. This way, language intelligence like Go To Definition can continue working in spite of an incomplete file; if we tell the editor to ‘go to the definition of <code>a</code>’, it will know where to go because it’s recognised two separate variable definitions. The parser would also report an error on the second <code>let</code> keyword along the lines of</p><pre><code>expected number, identifier, ‘-’ or ‘(’, but found ‘let’
-</code></pre><p>Our goal for the rest of this part is to make Eldiro have this behaviour.</p><h1 id=a-naive-strategy-for-error-recovery>A naive strategy for error recovery</h1><p>This is the simplest of all the error recovery techniques; if you expect to see a <code>Foo</code>, but see something else, you skip tokens until you find a <code>Foo</code>. This is simple to implement but doesn’t deliver the best output, since it throws away a lot of possibly-useful tokens. For example, all the underlined tokens here are thrown away:</p><pre><code class=language-- data-lang=->let a =
+</code></pre><p>What we want is for our parser to recognise two variable definitions, with the first missing an expression. This way, language intelligence like Go To Definition can continue working in spite of an incomplete file; if we tell the editor to ‘go to the definition of <code>a</code>’, it will know where to go because it’s recognised two separate variable definitions. The parser would also report an error on the second <code>let</code> keyword along the lines of</p>
+<pre tabindex=0><code>expected number, identifier, ‘-’ or ‘(’, but found ‘let’
+</code></pre><p>Our goal for the rest of this part is to make Eldiro have this behaviour.</p>
+<h1 id=a-naive-strategy-for-error-recovery>A naive strategy for error recovery</h1>
+<p>This is the simplest of all the error recovery techniques; if you expect to see a <code>Foo</code>, but see something else, you skip tokens until you find a <code>Foo</code>. This is simple to implement but doesn’t deliver the best output, since it throws away a lot of possibly-useful tokens. For example, all the underlined tokens here are thrown away:</p>
+<pre tabindex=0><code class=language-- data-lang=->let a =
 let b = a
 -------
-</code></pre><p>Here the IDE’s Go To Definition on <code>a</code> wouldn’t work, and the user would get an ‘undefined variable <code>a</code>’ error. Evidently, this error recovery strategy doesn’t let us achieve the ideal case we laid out before.</p><h1 id=a-better-way>A better way</h1><p>The idea is to start with the above approach, but <em>don’t skip certain tokens.</em> For example, let’s say we have the following code:</p><pre><code>{
+</code></pre><p>Here the IDE’s Go To Definition on <code>a</code> wouldn’t work, and the user would get an ‘undefined variable <code>a</code>’ error. Evidently, this error recovery strategy doesn’t let us achieve the ideal case we laid out before.</p>
+<h1 id=a-better-way>A better way</h1>
+<p>The idea is to start with the above approach, but <em>don’t skip certain tokens.</em> For example, let’s say we have the following code:</p>
+<pre tabindex=0><code>{
   let a = {
     let bar =
   }
   10
 }
-</code></pre><p>The naive approach would start looking for an expression after the <code>let bar =</code>, and would stop throwing away tokens at <code>10</code>. It now consumes the final <code>}</code> to close the <code>let a = {</code> block. This doesn’t leave a <code>}</code> to close the surrounding block, though, which means the user gets an ‘unclosed <code>{</code>’ error. Here’s roughly what the parser sees if you don’t include errors and fix the indentation:</p><pre><code>{
+</code></pre><p>The naive approach would start looking for an expression after the <code>let bar =</code>, and would stop throwing away tokens at <code>10</code>. It now consumes the final <code>}</code> to close the <code>let a = {</code> block. This doesn’t leave a <code>}</code> to close the surrounding block, though, which means the user gets an ‘unclosed <code>{</code>’ error. Here’s roughly what the parser sees if you don’t include errors and fix the indentation:</p>
+<pre tabindex=0><code>{
   let a = {
     let bar = 10
   }
-</code></pre><p>With the fancier approach, we can tell the parser not to skip <code>}</code> tokens, since those are important for recognising program structure. In languages with explicit statement terminators, parsers are often constructed so that <code>;</code> is never skipped. These tokens that aren’t to be skipped by the parser during error recovery are called ‘recovery sets’.</p><p>We can improve on this approach by only ever skipping one token, which means we throw away even less of the input.</p><p>Remember that ideal example from earlier?</p><pre><code>let a =
+</code></pre><p>With the fancier approach, we can tell the parser not to skip <code>}</code> tokens, since those are important for recognising program structure. In languages with explicit statement terminators, parsers are often constructed so that <code>;</code> is never skipped. These tokens that aren’t to be skipped by the parser during error recovery are called ‘recovery sets’.</p>
+<p>We can improve on this approach by only ever skipping one token, which means we throw away even less of the input.</p>
+<p>Remember that ideal example from earlier?</p>
+<pre tabindex=0><code>let a =
 let b = a
-</code></pre><p>We can achieve the goal of recognising two variable declarations by including <code>let</code> in the parser’s recovery set. This way, whenever the parser encounters an unexpected <code>let</code>, it will stop parsing what it’s up to and keep returning from subparsers until it gets to a state in which <code>let</code> can be recognised.</p><h1 id=implementing-error-recovery>Implementing error recovery</h1><p>Let’s write a test for the case we just discussed:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</code></pre><p>We can achieve the goal of recognising two variable declarations by including <code>let</code> in the parser’s recovery set. This way, whenever the parser encounters an unexpected <code>let</code>, it will stop parsing what it’s up to and keep returning from subparsers until it gets to a state in which <code>let</code> can be recognised.</p>
+<h1 id=implementing-error-recovery>Implementing error recovery</h1>
+<p>Let’s write a test for the case we just discussed:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -224,7 +299,8 @@ let b = a
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write an <code>expect</code> method on <code>Parser</code> that takes a given <code>SyntaxKind</code> and <code>bump</code>s past it if the parser is up to it; if it isn’t, then we might skip the token depending on whether it’s part of the recovery set:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Let’s write an <code>expect</code> method on <code>Parser</code> that takes a given <code>SyntaxKind</code> and <code>bump</code>s past it if the parser is up to it; if it isn’t, then we might skip the token depending on whether it’s part of the recovery set:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>const</span><span class=w> </span><span class=n>RECOVERY_SET</span>: <span class=p>[</span><span class=n>SyntaxKind</span><span class=p>;</span><span class=w> </span><span class=mi>1</span><span class=p>]</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=p>[</span><span class=n>SyntaxKind</span>::<span class=n>LetKw</span><span class=p>];</span><span class=w>
 </span><span class=w>
@@ -241,7 +317,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s use this method in <code>variable_def</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</span></code></pre></div><p>Let’s use this method in <code>variable_def</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>variable_def</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LetKw</span><span class=p>));</span><span class=w>
@@ -255,7 +332,9 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableDef</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Although this <em>does</em> make the code cleaner, the test still fails. After all, the part that’s breaking it is in <code>expr</code>, not here!</p><p>Let’s write an <code>error</code> method that we can call if <code>expr</code> has exhausted all possibilities:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Although this <em>does</em> make the code cleaner, the test still fails. After all, the part that’s breaking it is in <code>expr</code>, not here!</p>
+<p>Let’s write an <code>error</code> method that we can call if <code>expr</code> has exhausted all possibilities:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>expect</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -280,7 +359,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’ve reimplemented <code>Parser::expect</code> in terms of <code>Parser::error</code>, and we’ve also defined a small helper method that checks whether the parser is currently at a given set of <code>SyntaxKind</code>s. Let’s make use of this code:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>We’ve reimplemented <code>Parser::expect</code> in terms of <code>Parser::error</code>, and we’ve also defined a small helper method that checks whether the parser is currently at a given set of <code>SyntaxKind</code>s. Let’s make use of this code:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>lhs</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>cm</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -296,7 +376,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>cm</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now have multiple failing tests! This is because we are trying to call <code>p.bump()</code> when we’ve arrived at the end of the input. We could add a check for if we are at the end of the input and not call <code>p.error()</code> then, but that would be incorrect. Think about it: if we’re trying to parse the left-hand side of an expression and are at the end of the input, that’s rightly an error. Instead, we should avoid calling <code>Parser::bump</code> in <code>Parser::error</code> if we’re at the end of the input.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>We now have multiple failing tests! This is because we are trying to call <code>p.bump()</code> when we’ve arrived at the end of the input. We could add a check for if we are at the end of the input and not call <code>p.error()</code> then, but that would be incorrect. Think about it: if we’re trying to parse the left-hand side of an expression and are at the end of the input, that’s rightly an error. Instead, we should avoid calling <code>Parser::bump</code> in <code>Parser::error</code> if we’re at the end of the input.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -315,7 +396,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Our test is still failing because we’re calling <code>unwrap</code> in <code>variable_def</code>. We don’t need that anymore because we’re implementing proper error recovery:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</span></code></pre></div><p>Our test is still failing because we’re calling <code>unwrap</code> in <code>variable_def</code>. We don’t need that anymore because we’re implementing proper error recovery:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>variable_def</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LetKw</span><span class=p>));</span><span class=w>
@@ -329,7 +411,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableDef</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Running our tests shows that the parser is parsing the first variable definition correctly, but the second one is missing. This is because <code>grammar::root</code> only consumes a single statement. Let’s make it consume multiple:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
+</span></code></pre></div><p>Running our tests shows that the parser is parsing the first variable definition correctly, but the second one is missing. This is because <code>grammar::root</code> only consumes a single statement. Let’s make it consume multiple:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>root</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
@@ -340,7 +423,8 @@ let b = a
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write a test for that:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s write a test for that:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>check</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=n>expect_test</span>::<span class=n>expect</span><span class=p>;</span><span class=w>
@@ -366,7 +450,8 @@ let b = a
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now both that test and <code>recover_on_let_token</code> pass!</p><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><p>Now both that test and <code>recover_on_let_token</code> pass!</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -376,7 +461,8 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 20 tests
 ....................
 test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s wrap the tokens we <code>bump</code> in <code>Parser::error</code> in an <code>Error</code> node so we can distinguish them from tokens that are actually meant to be there:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</code></pre><p>Let’s wrap the tokens we <code>bump</code> in <code>Parser::error</code> in an <code>Error</code> node so we can distinguish them from tokens that are actually meant to be there:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -391,7 +477,9 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We don’t currently have any tests that contain erroneous tokens that end up being skipped, so all our tests are still passing.</p><p>Currently, <code>expr_binding_power</code> doesn’t do any error recovery directly; heck, we still have those comments in there reminding us to add it! Let’s remove them:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>We don’t currently have any tests that contain erroneous tokens that end up being skipped, so all our tests are still passing.</p>
+<p>Currently, <code>expr_binding_power</code> doesn’t do any error recovery directly; heck, we still have those comments in there reminding us to add it! Let’s remove them:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
@@ -407,7 +495,8 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What should we do in the case of the <code>break</code> when we’re working out the binding power of the current operator? One approach is to fall back to naive error recovery and loop until we find an operator. This brings with it all the problems of this strategy, though. Another option that’s <a href=https://github.com/rust-analyzer/rust-analyzer/blob/c01cd6e3ed0763f8e773c34dc76db0e39396133d/crates/parser/src/grammar/expressions.rs#L216>used by rust-analyzer</a> is to define a dummy <code>NotAnOp</code> variant of <code>BinaryOp</code> with a binding power of <code>(0, 1)</code>. Let’s try that out:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>What should we do in the case of the <code>break</code> when we’re working out the binding power of the current operator? One approach is to fall back to naive error recovery and loop until we find an operator. This brings with it all the problems of this strategy, though. Another option that’s <a href=https://github.com/rust-analyzer/rust-analyzer/blob/c01cd6e3ed0763f8e773c34dc76db0e39396133d/crates/parser/src/grammar/expressions.rs#L216>used by rust-analyzer</a> is to define a dummy <code>NotAnOp</code> variant of <code>BinaryOp</code> with a binding power of <code>(0, 1)</code>. Let’s try that out:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -447,7 +536,8 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>If we run our tests we’ll see that a lot have panicked on <code>Option::unwrap</code>. This is due to the <code>p.bump()</code> call in <code>expr_binding_power</code> that panics when the parser is at the end of its input. We can solve this bug by adding an arm for <code>None</code>, and breaking out of the loop. It’s correct <em>not</em> to call <code>Parser::error</code> here, since parsing out a left-hand side and then being at the end of the input isn’t <em>bad</em> &ndash; it just means that this expression wasn’t binary.</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>If we run our tests we’ll see that a lot have panicked on <code>Option::unwrap</code>. This is due to the <code>p.bump()</code> call in <code>expr_binding_power</code> that panics when the parser is at the end of its input. We can solve this bug by adding an arm for <code>None</code>, and breaking out of the loop. It’s correct <em>not</em> to call <code>Parser::error</code> here, since parsing out a left-hand side and then being at the end of the input isn’t <em>bad</em> &ndash; it just means that this expression wasn’t binary.</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -468,7 +558,8 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Some of our tests are now failing on a failed assertion that the parser is up to <code>)</code>. This is because we also need to return from <code>expr_binding_power</code> in that case; if we see a <code>)</code>, we know we’re done parsing this expression and can let the caller continue:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Some of our tests are now failing on a failed assertion that the parser is up to <code>)</code>. This is because we also need to return from <code>expr_binding_power</code> in that case; if we see a <code>)</code>, we know we’re done parsing this expression and can let the caller continue:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -489,9 +580,17 @@ test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now have one failing test &ndash; <code>parse_multiple_statements</code>. Here’s the test’s input string:</p><pre><code>let a = 1
+</span></code></pre></div><p>We now have one failing test &ndash; <code>parse_multiple_statements</code>. Here’s the test’s input string:</p>
+<pre tabindex=0><code>let a = 1
 a
-</code></pre><p>The parser goes along its way, <code>bump</code>ing <code>let</code>, <code>a</code> and <code>=</code>, at which point it needs an expression. It parses out <code>1</code> as <code>lhs</code>, and thinks ‘alright, I now need an operator’. It sees the <code>a</code> on the next line and thinks ‘oh, I didn’t expect this! I guess the user meant to type an operator, but typed <code>a</code> instead. Since this isn’t in <code>RECOVERY_SET</code> I’ll wrap this in an <code>Error</code> node and continue parsing’. The parser now tries to <code>bump</code> past the operator, even though it’s already done so in <code>Parser::error</code> and therefore is at the end of the input, causing a panic.</p><p>We have two options:</p><ul><li>detect the newline between <code>1</code> and <code>a</code> and decide that they must be separate expressions. This implies disallowing newlines between infix operators and their operands, which is a relatively common use-case (think of long expressions broken across multiple lines). We would want to handle newlines automatically, just like whitespace, which means we would have to create machinery that allows us to both check for newlines <em>while also</em> ignoring their existence. Furthermore, making Eldiro whitespace-sensitive is not a decision I take lightly; it’s nice to not have to worry or think about whitespace when you’re writing code, and instead let the autoformatter add it for you.</li><li>give up if we don’t see an operator and just return from the function. This means we’ll get worse error messages if the user mistypes an infix operator as another token.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></li></ul><p>To me, option two seems like the lesser evil, so that’s what we’ll implement. Let’s undo all those changes:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>The parser goes along its way, <code>bump</code>ing <code>let</code>, <code>a</code> and <code>=</code>, at which point it needs an expression. It parses out <code>1</code> as <code>lhs</code>, and thinks ‘alright, I now need an operator’. It sees the <code>a</code> on the next line and thinks ‘oh, I didn’t expect this! I guess the user meant to type an operator, but typed <code>a</code> instead. Since this isn’t in <code>RECOVERY_SET</code> I’ll wrap this in an <code>Error</code> node and continue parsing’. The parser now tries to <code>bump</code> past the operator, even though it’s already done so in <code>Parser::error</code> and therefore is at the end of the input, causing a panic.</p>
+<p>We have two options:</p>
+<ul>
+<li>detect the newline between <code>1</code> and <code>a</code> and decide that they must be separate expressions. This implies disallowing newlines between infix operators and their operands, which is a relatively common use-case (think of long expressions broken across multiple lines). We would want to handle newlines automatically, just like whitespace, which means we would have to create machinery that allows us to both check for newlines <em>while also</em> ignoring their existence. Furthermore, making Eldiro whitespace-sensitive is not a decision I take lightly; it’s nice to not have to worry or think about whitespace when you’re writing code, and instead let the autoformatter add it for you.</li>
+<li>give up if we don’t see an operator and just return from the function. This means we’ll get worse error messages if the user mistypes an infix operator as another token.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></li>
+</ul>
+<p>To me, option two seems like the lesser evil, so that’s what we’ll implement. Let’s undo all those changes:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -529,7 +628,8 @@ a
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The only sketchy non-recovering bit of the parser left is <code>paren_expr</code>, which <code>assert</code>s the existence of a closing parenthesis. Let’s write a test to make sure that we don’t get a panic on an unclosed parenthesis:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>The only sketchy non-recovering bit of the parser left is <code>paren_expr</code>, which <code>assert</code>s the existence of a closing parenthesis. Let’s write a test to make sure that we don’t get a panic on an unclosed parenthesis:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -546,7 +646,7 @@ a
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -566,7 +666,8 @@ failures:
     grammar::expr::tests::parse_unclosed_parentheses
 
 test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>As expected, the parser panicked on that <code>assert</code>. Let’s replace the <code>assert</code>-and-<code>bump</code> dance with a simple call to <code>expect</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>paren_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>As expected, the parser panicked on that <code>assert</code>. Let’s replace the <code>assert</code>-and-<code>bump</code> dance with a simple call to <code>expect</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>paren_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>));</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
@@ -576,7 +677,7 @@ test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>ParenExpr</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -586,7 +687,16 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 21 tests
 .....................
 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Although we’re done with error recovery for now, this topic is deep and we’ll have to consider it in all changes we make to the parser in future.</p><h1 id=implementing-error-reporting>Implementing error reporting</h1><p>Now that our parser doesn’t explode when the user makes a typo, we’re ready to move on to the next topic: error reporting. In cases such as the missing parenthesis, the error of not including the parenthesis is <em>silently ignored.</em> A way to ensure parse errors are being created properly is to include them below the syntax tree in tests; with this change all inputs that have parse errors have to document them.</p><p>One aspect of good error messages is that they show what tokens the parser was expecting to see in the situation that caused the error. This gives the user a hint as to what they might try to fix the error. To implement this behaviour, the parser has to track which tokens it’s expecting throughout the parsing process; when it encounters an error this set can be displayed. We can use a technique <a href="https://www.reddit.com/r/rust/comments/jh69jx/blog_post_introducing_ungrammar/ga1gms8?utm_source=share&utm_medium=web2x&context=3">mentioned on Reddit</a> by u/matklad:</p><ul><li>Every time <code>Parser::at</code> is called we’ll add the <code>SyntaxKind</code> being enquired about to an <code>expected_kinds</code> field on <code>Parser</code></li><li>Whenever a token is added to the syntax tree the set is cleared</li></ul><p>Let’s write this now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</code></pre><p>Although we’re done with error recovery for now, this topic is deep and we’ll have to consider it in all changes we make to the parser in future.</p>
+<h1 id=implementing-error-reporting>Implementing error reporting</h1>
+<p>Now that our parser doesn’t explode when the user makes a typo, we’re ready to move on to the next topic: error reporting. In cases such as the missing parenthesis, the error of not including the parenthesis is <em>silently ignored.</em> A way to ensure parse errors are being created properly is to include them below the syntax tree in tests; with this change all inputs that have parse errors have to document them.</p>
+<p>One aspect of good error messages is that they show what tokens the parser was expecting to see in the situation that caused the error. This gives the user a hint as to what they might try to fix the error. To implement this behaviour, the parser has to track which tokens it’s expecting throughout the parsing process; when it encounters an error this set can be displayed. We can use a technique <a href="https://www.reddit.com/r/rust/comments/jh69jx/blog_post_introducing_ungrammar/ga1gms8?utm_source=share&utm_medium=web2x&context=3">mentioned on Reddit</a> by u/matklad:</p>
+<ul>
+<li>Every time <code>Parser::at</code> is called we’ll add the <code>SyntaxKind</code> being enquired about to an <code>expected_kinds</code> field on <code>Parser</code></li>
+<li>Whenever a token is added to the syntax tree the set is cleared</li>
+</ul>
+<p>Let’s write this now:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>source</span>: <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
@@ -618,14 +728,17 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Throughout <code>grammar</code> we often <code>match</code> on <code>p.peek()</code> to determine what to do next. Although this results in easy-to-read code, it is incompatible with this new approach. How is the parser meant to manage <code>expected_kinds</code> if it can’t know which arm of the <code>match</code> is being run and which ones have been tried before? We’ll have to convert all these <code>match</code>es to <code>if else</code> chains that use <code>Parser::at</code>.</p><p>To ensure we don’t accidentally use the old <code>match</code> approach in future, let’s make <code>Parser::peek</code> private:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Throughout <code>grammar</code> we often <code>match</code> on <code>p.peek()</code> to determine what to do next. Although this results in easy-to-read code, it is incompatible with this new approach. How is the parser meant to manage <code>expected_kinds</code> if it can’t know which arm of the <code>match</code> is being run and which ones have been tried before? We’ll have to convert all these <code>match</code>es to <code>if else</code> chains that use <code>Parser::at</code>.</p>
+<p>To ensure we don’t accidentally use the old <code>match</code> approach in future, let’s make <code>Parser::peek</code> private:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>source</span><span class=p>.</span><span class=n>peek_kind</span><span class=p>()</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s update all the usages of <code>Parser::peek</code> now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>Let’s update all the usages of <code>Parser::peek</code> now:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
@@ -667,7 +780,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>cm</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>stmt</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LetKw</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -676,7 +789,9 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>That’s &mldr; not that bad. Most long <code>if else</code> chains look horribly ugly, but this one is ok.</p><p>The next change we need to make is emit errors from the parser. For that we’ll need a type that can represent a parse error:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>That’s &mldr; not that bad. Most long <code>if else</code> chains look horribly ugly, but this one is ok.</p>
+<p>The next change we need to make is emit errors from the parser. For that we’ll need a type that can represent a parse error:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -688,7 +803,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/parser/parse_error.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/parser/parse_error.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
@@ -699,7 +814,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=n>found</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=n>range</span>: <span class=nc>TextRange</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># crates/parser/Cargo.toml</span>
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/parser/Cargo.toml</span>
 
 <span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
 <span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
@@ -707,7 +822,9 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 <span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
 <span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
 <span class=nx>text-size</span> <span class=p>=</span> <span class=s2>&#34;1.0.0&#34;</span>
-</code></pre></div><p>We’re using <code>TextRange</code> from the text-size crate instead of <code>std::ops::Range&lt;usize></code> because <code>TextRange</code> uses <code>u32</code> internally, making its size in memory smaller.</p><p>The way we’ll communicate the parse errors the parser finds to other code is through the existing <code>Event</code> infrastructure. Let’s create <code>Event::Error</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</code></pre></div><p>We’re using <code>TextRange</code> from the text-size crate instead of <code>std::ops::Range&lt;usize></code> because <code>TextRange</code> uses <code>u32</code> internally, making its size in memory smaller.</p>
+<p>The way we’ll communicate the parse errors the parser finds to other code is through the existing <code>Event</code> infrastructure. Let’s create <code>Event::Error</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>ParseError</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
@@ -723,7 +840,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>Error</span><span class=p>(</span><span class=n>ParseError</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Placeholder</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can push the <code>Event::Error</code> event when the parser encounters an error (which we’ve conveniently centralised into the <code>Parser::error</code> method):</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>We can push the <code>Event::Error</code> event when the parser encounters an error (which we’ve conveniently centralised into the <code>Parser::error</code> method):</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>grammar</span><span class=p>;</span><span class=w>
@@ -754,7 +872,9 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>That <code>mem::take</code> function returns what is passed in, and replaces the thing that was passed in with its default value. In other words, it lets us concisely take ownership of <code>self.expected_kinds</code> while replacing it with a new empty <code>Vec</code>. We don’t have a way to get the range of the current token, though.</p><p>Let’s add a <code>range</code> field to <code>Token</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/lib.rs
+</span></code></pre></div><p>That <code>mem::take</code> function returns what is passed in, and replaces the thing that was passed in with its default value. In other words, it lets us concisely take ownership of <code>self.expected_kinds</code> while replacing it with a new empty <code>Vec</code>. We don’t have a way to get the range of the current token, though.</p>
+<p>Let’s add a <code>range</code> field to <code>Token</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>logos</span>::<span class=n>Logos</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
@@ -767,12 +887,13 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>text</span>: <span class=kp>&amp;</span><span class=na>&#39;a</span><span class=w> </span><span class=kt>str</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=n>range</span>: <span class=nc>TextRange</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-toml data-lang=toml><span class=c># crates/lexer/Cargo.toml</span>
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/lexer/Cargo.toml</span>
 
 <span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
 <span class=nx>logos</span> <span class=p>=</span> <span class=s2>&#34;0.11.4&#34;</span>
 <span class=nx>text-size</span> <span class=p>=</span> <span class=s2>&#34;1.0.0&#34;</span>
-</code></pre></div><p>We need to update <code>Lexer</code> to emit ranges:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</code></pre></div><p>We need to update <code>Lexer</code> to emit ranges:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>logos</span>::<span class=n>Logos</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>convert</span>::<span class=n>TryFrom</span><span class=p>;</span><span class=w>
@@ -799,7 +920,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>Self</span>::<span class=n>Item</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>,</span><span class=w> </span><span class=n>range</span><span class=w> </span><span class=p>})</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// token_kind.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// token_kind.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -816,7 +937,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To access these ranges from the parser, we need to change <code>Source</code>’s API:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
+</span></code></pre></div><p>To access these ranges from the parser, we need to change <code>Source</code>’s API:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Source</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -837,7 +959,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And use it from <code>Parser::error</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>And use it from <code>Parser::error</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>grammar</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
@@ -873,7 +996,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Take a look at that <code>todo!()</code> though; what range do we use for the parse error if we’re at the end of the input? To me the most sensible answer is to use the range of the last token. Let’s add another method to <code>Source</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Take a look at that <code>todo!()</code> though; what range do we use for the parse error if we’re at the end of the input? To me the most sensible answer is to use the range of the last token. Let’s add another method to <code>Source</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -888,7 +1012,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We return an <code>Option</code> because it isn’t up to <code>Source</code> to handle the case in which the input is empty; we’ll leave that up to the parser. Speaking of which, <code>Parser:error</code> won’t ever be called when the input is empty because we know that <code>grammar::root</code> is fine with empty inputs. Thus, it is safe to unwrap:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We return an <code>Option</code> because it isn’t up to <code>Source</code> to handle the case in which the input is empty; we’ll leave that up to the parser. Speaking of which, <code>Parser:error</code> won’t ever be called when the input is empty because we know that <code>grammar::root</code> is fine with empty inputs. Thus, it is safe to unwrap:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>error</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -916,7 +1041,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have one last compilation error in <code>Sink</code>, which we need to change to maintain a list of parse errors:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><p>We have one last compilation error in <code>Sink</code>, which we need to change to maintain a list of parse errors:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>ParseError</span><span class=p>;</span><span class=w>
@@ -969,7 +1095,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Fixing these basic compilation errors has revealed a borrow checker error; fortunately for us, this is trivial to fix by converting the call to <code>Option::map_or_else</code> in <code>Parser::error</code> to an <code>if let</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Fixing these basic compilation errors has revealed a borrow checker error; fortunately for us, this is trivial to fix by converting the call to <code>Option::map_or_else</code> in <code>Parser::error</code> to an <code>if let</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -1000,7 +1127,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Although we now have a <code>Vec&lt;ParseError></code>, we aren’t using it! Let’s add it as a field to <code>Parse</code>, which we’ll construct directly from <code>Sink::finish</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span></code></pre></div><p>Although we now have a <code>Vec&lt;ParseError></code>, we aren’t using it! Let’s add it as a field to <code>Parse</code>, which we’ll construct directly from <code>Sink::finish</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Lexer</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>parser</span>::<span class=p>{</span><span class=n>ParseError</span><span class=p>,</span><span class=w> </span><span class=n>Parser</span><span class=p>};</span><span class=w>
@@ -1023,7 +1151,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>green_node</span>: <span class=nc>GreenNode</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>errors</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ParseError</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>ParseError</span><span class=p>;</span><span class=w>
@@ -1049,7 +1177,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to be able to display parse errors, both for display to the user and for usage in tests. Let’s write a test to start:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parse_error.rs
+</span></code></pre></div><p>We need to be able to display parse errors, both for display to the user and for usage in tests. Let’s write a test to start:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parse_error.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1085,7 +1214,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write a dead-simple initial implementation:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>fmt</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Let’s write a dead-simple initial implementation:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>fmt</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -1103,7 +1233,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This depends on a <code>Display</code> implementation on <code>SyntaxKind</code>; we can write that now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
+</span></code></pre></div><p>This depends on a <code>Display</code> implementation on <code>SyntaxKind</code>; we can write that now:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/syntax/src/lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>TokenKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>num_derive</span>::<span class=p>{</span><span class=n>FromPrimitive</span><span class=p>,</span><span class=w> </span><span class=n>ToPrimitive</span><span class=p>};</span><span class=w>
@@ -1134,7 +1265,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>})</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s verify that parse errors are emitted properly by including them in tests:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/lib.rs
+</span></code></pre></div><p>Let’s verify that parse errors are emitted properly by including them in tests:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>debug_tree</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>String</span> <span class=p>{</span><span class=w>
@@ -1153,7 +1285,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>s</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We get two test failures, one of which is from the <code>unwrap</code> in <code>ParseError</code>’s <code>Display</code> implementation, while the other is from the error message not being in the test’s expected text. Let’s write a test for the case where the error is at the end of the input and <code>found</code> is therefore <code>None</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parse_error.rs
+</span></code></pre></div><p>We get two test failures, one of which is from the <code>unwrap</code> in <code>ParseError</code>’s <code>Display</code> implementation, while the other is from the error message not being in the test’s expected text. Let’s write a test for the case where the error is at the end of the input and <code>found</code> is therefore <code>None</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parse_error.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1169,7 +1302,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To solve this, we can change the <code>Display</code> implementation to check if <code>found</code> is <code>None</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ParseError</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>To solve this, we can change the <code>Display</code> implementation to check if <code>found</code> is <code>None</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ParseError</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>fmt</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>f</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Formatter</span><span class=o>&lt;</span><span class=na>&#39;_</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>fmt</span>::<span class=nb>Result</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=w>
 </span><span class=w>            </span><span class=n>f</span><span class=p>,</span><span class=w>
@@ -1186,7 +1320,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We should write a test to cover the case where <code>expected</code> has more than one kind:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>We should write a test to cover the case where <code>expected</code> has more than one kind:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -1205,7 +1340,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This can be implemented with a loop:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ParseError</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>This can be implemented with a loop:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ParseError</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>fmt</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>f</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Formatter</span><span class=o>&lt;</span><span class=na>&#39;_</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>fmt</span>::<span class=nb>Result</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=w>
 </span><span class=w>            </span><span class=n>f</span><span class=p>,</span><span class=w>
@@ -1235,7 +1371,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s add a test for when two <code>SyntaxKind</code> are expected to make sure that <code>or</code> is added between them instead of a comma:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s add a test for when two <code>SyntaxKind</code> are expected to make sure that <code>or</code> is added between them instead of a comma:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -1251,7 +1388,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Looking through the failed tests shows that the error messages are being generated properly. We can update these automatically using expect-test:</p><pre><code class=language-- data-lang=->$ UPDATE_EXPECT=1 cargo t -q --lib
+</span></code></pre></div><p>Looking through the failed tests shows that the error messages are being generated properly. We can update these automatically using expect-test:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ UPDATE_EXPECT=1 cargo t -q --lib
 
 running 18 tests
 ..................
@@ -1261,7 +1399,8 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 25 tests
 .........................
 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s try out our error recovery and reporting in the REPL:</p><pre><code class=language-- data-lang=->$ cargo r -q
+</code></pre><p>Let’s try out our error recovery and reporting in the REPL:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo r -q
 → (1+
 Root@0..4
   ParenExpr@0..4
@@ -1273,7 +1412,9 @@ Root@0..4
       Whitespace@3..4 &quot;\n&quot;
 error at 3..4: expected number, identifier, ‘-’ or ‘(’
 error at 3..4: expected ‘+’, ‘-’, ‘*’, ‘/’ or ‘)’
-</code></pre><p>The first of those two parse errors makes sense, because an expression is expected after an operator. The second one, not so much; why would you add another operator after an existing operator?</p><p>It’s non-obvious why the parser is emitting the second error message (apart from the <code>)</code>); to understand why it’s doing this we should keep the basic structure of <code>expr_binding_power</code> in mind:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>The first of those two parse errors makes sense, because an expression is expected after an operator. The second one, not so much; why would you add another operator after an existing operator?</p>
+<p>It’s non-obvious why the parser is emitting the second error message (apart from the <code>)</code>); to understand why it’s doing this we should keep the basic structure of <code>expr_binding_power</code> in mind:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1283,7 +1424,8 @@ error at 3..4: expected ‘+’, ‘-’, ‘*’, ‘/’ or ‘)’
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s imagine we’re parsing the <code>1+</code> in <code>(1+</code>. We successfully get a left-hand side, and now enter the loop and extract an operator. We now recurse, and fail to get a left-hand side. This means we return <code>None</code> from this inner call. Here’s where the problem lies: rather than exiting because we couldn’t get a right-hand side, we just loop around again and try to get another operator. Let’s add a check to <code>expr_binding_power</code> to fix this issue:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>Let’s imagine we’re parsing the <code>1+</code> in <code>(1+</code>. We successfully get a left-hand side, and now enter the loop and extract an operator. We now recurse, and fail to get a left-hand side. This means we return <code>None</code> from this inner call. Here’s where the problem lies: rather than exiting because we couldn’t get a right-hand side, we just loop around again and try to get another operator. Let’s add a check to <code>expr_binding_power</code> to fix this issue:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
@@ -1302,7 +1444,8 @@ error at 3..4: expected ‘+’, ‘-’, ‘*’, ‘/’ or ‘)’
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Instead of manually typing out that scenario from before in the REPL to find out if we’ve squashed the bug, we can write a test to ensure we never regress on this specific scenario:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Instead of manually typing out that scenario from before in the REPL to find out if we’ve squashed the bug, we can write a test to ensure we never regress on this specific scenario:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -1325,7 +1468,8 @@ error at 3..4: expected ‘+’, ‘-’, ‘*’, ‘/’ or ‘)’
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It makes sense that we would get two errors, since there really are two errors here: that of the binary expression missing a right-hand side, and that of an unclosed parenthesis.</p><pre><code class=language-- data-lang=->$ cargo t -q --lib
+</span></code></pre></div><p>It makes sense that we would get two errors, since there really are two errors here: that of the binary expression missing a right-hand side, and that of an unclosed parenthesis.</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -1335,13 +1479,15 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 26 tests
 ..........................
 test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=refactoring>Refactoring</h1><p>We’re almost done! Currently, Eldiro uses <code>TokenKind</code>s exclusively in the lexer, and converts them to <code>SyntaxKind</code>s for use everywhere else. We’d be better off with using <code>TokenKind</code> for things that can’t be any of the node variants exclusive to <code>SyntaxKind</code>, such as the <code>SyntaxKind</code> passed into <code>Parser::at</code>. This is a straightforward change to make, so I’ll just show the changed sections without any explanation:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
+</code></pre><h1 id=refactoring>Refactoring</h1>
+<p>We’re almost done! Currently, Eldiro uses <code>TokenKind</code>s exclusively in the lexer, and converts them to <code>SyntaxKind</code>s for use everywhere else. We’d be better off with using <code>TokenKind</code> for things that can’t be any of the node variants exclusive to <code>SyntaxKind</code>, such as the <code>SyntaxKind</code> passed into <code>Parser::at</code>. This is a straightforward change to make, so I’ll just show the changed sections without any explanation:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>TokenKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>grammar</span><span class=p>;</span><span class=w>
@@ -1396,7 +1542,7 @@ test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/token_kind.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/token_kind.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>logos</span>::<span class=n>Logos</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>fmt</span><span class=p>;</span><span class=w>
@@ -1431,4 +1577,29 @@ test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>})</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Delete <code>SyntaxKind::is_trivia</code> and <code>SyntaxKind</code>’s <code>Display</code> implementation. Replace all uses of <code>SyntaxKind</code> with <code>TokenKind</code> in <code>parse_error.rs</code> and <code>sink.rs</code>. Now follow the Rust compiler’s errors to fix all the type errors that have now cropped up across the project. Sorry for this having a bit of a ‘this is left as an exercise for the reader’ feel, but I think that making this part any longer than it already is for the sake of simple substitutions is not a good idea.</p><p>Take a look at <a href=https://github.com/arzg/eldiro/commit/dbc2abb57a392e38b08e62fde0a1b7f8771b2720>the diff</a> of the commit that makes this change if you get confused or stuck.</p><h1 id=conclusion>Conclusion</h1><p>Hopefully this wasn’t too difficult to follow! We’ll create structures to work with parsed code in the next part.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>I mention this because, in my experience, this case is very rare; my most common typos with infix operators are mistyping one for the other, not as something completely different.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/17/>Part Seventeen: Crates</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/19/>Part Nineteen: Code Representations</a></div><div style=clear:both></div></nav></body></html>
+</span></code></pre></div><p>Delete <code>SyntaxKind::is_trivia</code> and <code>SyntaxKind</code>’s <code>Display</code> implementation. Replace all uses of <code>SyntaxKind</code> with <code>TokenKind</code> in <code>parse_error.rs</code> and <code>sink.rs</code>. Now follow the Rust compiler’s errors to fix all the type errors that have now cropped up across the project. Sorry for this having a bit of a ‘this is left as an exercise for the reader’ feel, but I think that making this part any longer than it already is for the sake of simple substitutions is not a good idea.</p>
+<p>Take a look at <a href=https://github.com/arzg/eldiro/commit/dbc2abb57a392e38b08e62fde0a1b7f8771b2720>the diff</a> of the commit that makes this change if you get confused or stuck.</p>
+<h1 id=conclusion>Conclusion</h1>
+<p>Hopefully this wasn’t too difficult to follow! We’ll create structures to work with parsed code in the next part.</p>
+<section class=footnotes role=doc-endnotes>
+<hr>
+<ol>
+<li id=fn:1 role=doc-endnote>
+<p>I mention this because, in my experience, this case is very rare; my most common typos with infix operators are mistyping one for the other, not as something completely different.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</main>
+<nav class=page-navigation>
+<div class=prev>
+<p class=hint>Previously</p>
+<a href=https://arzg.github.io/lang/17/>Part Seventeen: Crates</a>
+</div>
+<div class=next>
+<p class=hint>Next up</p>
+<a href=https://arzg.github.io/lang/19/>Part Nineteen: Code Representations</a>
+</div>
+<div style=clear:both></div>
+</nav>
+</body>
+</html>

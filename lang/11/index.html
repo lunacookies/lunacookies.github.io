@@ -1,4 +1,45 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Eleven: Refinements · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script><script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Eleven: Refinements</h1><section class=page-info><ul><li>17 November 2020</li><li>929 words</li><li>five minute read</li></ul></section></header><main><p>We’ve got a number of topics to cover this time, so let’s get started.</p><h1 id=a-bug-fix>A bug fix</h1><p>u/mozjag <a href="https://www.reddit.com/r/rust/comments/ju1vhl/make_a_language_in_rust_part_ten_starting_again/gcc7rk8?utm_source=share&utm_medium=web2x&context=3">pointed out</a> on Reddit that the regex we’re using to lex identifiers mandates that they have a length of two, when we could also allow identifiers with a single character. Let’s write a test for lexing a single-letter identifier to verify the bug is actually present:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+<!doctype html><html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Part Eleven: Refinements · arzg’s website</title>
+<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
+<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
+<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
+<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
+<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
+<link rel=manifest href=/site.webmanifest>
+</head>
+<body>
+<nav class=site-navigation>
+<ul>
+<li>
+<a href=/>Home</a>
+</li>
+<li>
+<a href=/blog/>Blog</a>
+</li>
+<li class=current>
+<a href=/lang/>Make A Language</a>
+</li>
+</ul>
+</nav>
+<header class=header-area>
+<h1 class=title>Part Eleven: Refinements</h1>
+<section class=page-info>
+<ul>
+<li>17 November 2020</li>
+<li>929 words</li>
+<li>five minute read</li>
+</ul>
+</section>
+</header>
+<main><p>We’ve got a number of topics to cover this time, so let’s get started.</p>
+<h1 id=a-bug-fix>A bug fix</h1>
+<p>u/mozjag <a href="https://www.reddit.com/r/rust/comments/ju1vhl/make_a_language_in_rust_part_ten_starting_again/gcc7rk8?utm_source=share&utm_medium=web2x&context=3">pointed out</a> on Reddit that the regex we’re using to lex identifiers mandates that they have a length of two, when we could also allow identifiers with a single character. Let’s write a test for lexing a single-letter identifier to verify the bug is actually present:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -11,7 +52,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 21 tests
 ..............F......
 failures:
@@ -27,7 +68,8 @@ failures:
     lexer::tests::lex_single_char_identifier
 
 test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We need to change the <code>+</code> in the <code>Ident</code> regex to be a <code>*</code> instead, so that <em>zero or more</em> repetitions are allowed instead of <em>one or more:</em></p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
+</code></pre><p>We need to change the <code>+</code> in the <code>Ident</code> regex to be a <code>*</code> instead, so that <em>zero or more</em> repetitions are allowed instead of <em>one or more:</em></p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -36,10 +78,12 @@ test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 .....................
 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=negation>Negation</h1><p>Up to now, all the operators we support have been <em>binary,</em> meaning that they have two operands. We’d like to have <em>unary</em> operators too, which are operators that have one operand. The operator we’ll add here is the prefix unary minus, as used for negation &ndash; the <code>-</code> in <code>-10</code>, for example. To start, we’ll need another node type:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
+</code></pre><h1 id=negation>Negation</h1>
+<p>Up to now, all the operators we support have been <em>binary,</em> meaning that they have two operands. We’d like to have <em>unary</em> operators too, which are operators that have one operand. The operator we’ll add here is the prefix unary minus, as used for negation &ndash; the <code>-</code> in <code>-10</code>, for example. To start, we’ll need another node type:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -47,7 +91,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>BinOp</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s rename <code>BinOp</code> to <code>BinaryExpr</code> for consistency (after all, we aren’t abbreviating <code>Prefix</code>):</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
+</span></code></pre></div><p>Let’s rename <code>BinOp</code> to <code>BinaryExpr</code> for consistency (after all, we aren’t abbreviating <code>Prefix</code>):</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -55,7 +100,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>BinaryExpr</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -124,7 +169,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can write a test for parsing an expression with the negation operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>We can write a test for parsing an expression with the negation operator:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -140,7 +186,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that an expression can start with something other than a number or an identifier, we need to modify that <code>match</code> at the start of <code>expr_binding_power</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Now that an expression can start with something other than a number or an identifier, we need to modify that <code>match</code> at the start of <code>expr_binding_power</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -151,7 +198,8 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>First, we should determine the binding power of the prefix operator we’ve found. To do this, we need to define a type that represents all the possible prefix operators we might encounter &ndash; <code>PrefixOp</code> sounds like a good name. Also, we should rename <code>Op</code> to <code>InfixOp</code> so that it’s differentiated from <code>PrefixOp</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>First, we should determine the binding power of the prefix operator we’ve found. To do this, we need to define a type that represents all the possible prefix operators we might encounter &ndash; <code>PrefixOp</code> sounds like a good name. Also, we should rename <code>Op</code> to <code>InfixOp</code> so that it’s differentiated from <code>PrefixOp</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -200,7 +248,9 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how the binding power of the negation operator is higher than that of any infix operator. This means that <code>-10 + 5</code> is parsed as <code>(-10) + 5</code> instead of <code>-(10 + 5)</code>.</p><p>We now do the same as in the case of an infix operator:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Note how the binding power of the negation operator is higher than that of any infix operator. This means that <code>-10 + 5</code> is parsed as <code>(-10) + 5</code> instead of <code>-(10 + 5)</code>.</p>
+<p>We now do the same as in the case of an infix operator:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -221,11 +271,12 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 22 tests
 ......................
 test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s add a test to make sure precedence is working as we would hope:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Let’s add a test to make sure precedence is working as we would hope:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -244,11 +295,13 @@ test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 23 tests
 .......................
 test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=parentheses>Parentheses</h1><p>Our lexer doesn’t lex parentheses, so we should start off by adding that:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</code></pre><h1 id=parentheses>Parentheses</h1>
+<p>Our lexer doesn’t lex parentheses, so we should start off by adding that:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos, FromPrimitive, ToPrimitive)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -281,11 +334,12 @@ test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 25 tests
 .........................
 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write a test for parsing a bunch of nested parentheses:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</code></pre><p>Let’s write a test for parsing a bunch of nested parentheses:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -313,7 +367,8 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s also add a test to see if adding parentheses allows us to change precedence as we would expect:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s also add a test to see if adding parentheses allows us to change precedence as we would expect:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -335,7 +390,8 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Once again we need to add another case to the <code>match</code> statement at the top of <code>expr_binding_power</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Once again we need to add another case to the <code>match</code> statement at the top of <code>expr_binding_power</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -349,7 +405,8 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The first thing we should do is <code>bump</code> the left parenthesis onto the current branch:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>The first thing we should do is <code>bump</code> the left parenthesis onto the current branch:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -366,7 +423,8 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>If you think about it, we can parse the contents of the parenthesised expression by calling <code>expr_binding_power</code> with <code>minimum_binding_power</code> set to <code>0</code>, since parenthesising something ‘resets’ precedence inside it. All we need to do after writing that is add another <code>p.bump()</code> to account for the closing parenthesis:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>If you think about it, we can parse the contents of the parenthesised expression by calling <code>expr_binding_power</code> with <code>minimum_binding_power</code> set to <code>0</code>, since parenthesising something ‘resets’ precedence inside it. All we need to do after writing that is add another <code>p.bump()</code> to account for the closing parenthesis:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>checkpoint</span><span class=p>();</span><span class=w>
 </span><span class=w>
 </span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -386,8 +444,31 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 27 tests
 ...........................
 test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=next-time>Next time</h1><p>In the next part we’ll restructure how the parser works internally so Eldiro can support a seemingly-basic feature: whitespace.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>It’s more appropriate to use <code>PrefixExpr</code> instead of <code>UnaryExpr</code> because a unary operator could also be <em>postfix,</em> meaning that you add it after the operand. For example, <code>?</code> in Rust is a postfix operator. It makes sense to differentiate the two because we might have to treat them differently in future.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/10/>Part Ten: Starting Again</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/12/>Part Twelve: Terminology</a></div><div style=clear:both></div></nav></body></html>
+</code></pre><h1 id=next-time>Next time</h1>
+<p>In the next part we’ll restructure how the parser works internally so Eldiro can support a seemingly-basic feature: whitespace.</p>
+<section class=footnotes role=doc-endnotes>
+<hr>
+<ol>
+<li id=fn:1 role=doc-endnote>
+<p>It’s more appropriate to use <code>PrefixExpr</code> instead of <code>UnaryExpr</code> because a unary operator could also be <em>postfix,</em> meaning that you add it after the operand. For example, <code>?</code> in Rust is a postfix operator. It makes sense to differentiate the two because we might have to treat them differently in future.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</main>
+<nav class=page-navigation>
+<div class=prev>
+<p class=hint>Previously</p>
+<a href=https://arzg.github.io/lang/10/>Part Ten: Starting Again</a>
+</div>
+<div class=next>
+<p class=hint>Next up</p>
+<a href=https://arzg.github.io/lang/12/>Part Twelve: Terminology</a>
+</div>
+<div style=clear:both></div>
+</nav>
+</body>
+</html>

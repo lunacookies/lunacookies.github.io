@@ -1,6 +1,48 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Five: Binding Usages · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script><script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script><script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Five: Binding Usages</h1><section class=page-info><ul><li>5 October 2020</li><li>576 words</li><li>three minute read</li></ul></section></header><main><p>After <a href=/lang/4>Part Four</a>, the longest so far, this will be a relatively short post: we’ll be adding support for binding usages. Here’s the syntax we’re after:</p><pre><code>let a = 10
+<!doctype html><html lang=en>
+<head>
+<meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>Part Five: Binding Usages · arzg’s website</title>
+<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
+<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
+<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
+<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
+<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
+<link rel=manifest href=/site.webmanifest>
+</head>
+<body>
+<nav class=site-navigation>
+<ul>
+<li>
+<a href=/>Home</a>
+</li>
+<li>
+<a href=/blog/>Blog</a>
+</li>
+<li class=current>
+<a href=/lang/>Make A Language</a>
+</li>
+</ul>
+</nav>
+<header class=header-area>
+<h1 class=title>Part Five: Binding Usages</h1>
+<section class=page-info>
+<ul>
+<li>5 October 2020</li>
+<li>576 words</li>
+<li>three minute read</li>
+</ul>
+</section>
+</header>
+<main><p>After <a href=/lang/4>Part Four</a>, the longest so far, this will be a relatively short post: we’ll be adding support for binding usages. Here’s the syntax we’re after:</p>
+<pre tabindex=0><code>let a = 10
 let b = a
-</code></pre><p>where <code>a</code> is a binding usage.</p><h1 id=parsing>Parsing</h1><p>Let’s begin with the parser. Add <code>pub mod binding_usage;</code> to <code>lib.rs</code>, and create a new file at <code>src/binding_usage.rs</code>. As usual, we’ll start with a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>where <code>a</code> is a binding usage.</p>
+<h1 id=parsing>Parsing</h1>
+<p>Let’s begin with the parser. Add <code>pub mod binding_usage;</code> to <code>lib.rs</code>, and create a new file at <code>src/binding_usage.rs</code>. As usual, we’ll start with a test:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -17,11 +59,13 @@ let b = a
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s add the definition of <code>BindingUsage</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>Let’s add the definition of <code>BindingUsage</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Since the syntax we’re using for binding usages is to simply write out the name of the binding being used,<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> all <code>BindingDef::new</code> has to do is call <code>utils::extract_ident</code>:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Since the syntax we’re using for binding usages is to simply write out the name of the binding being used,<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> all <code>BindingDef::new</code> has to do is call <code>utils::extract_ident</code>:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -37,11 +81,16 @@ let b = a
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s check if the parser is working as expected:</p><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>Let’s check if the parser is working as expected:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 25 tests
 .........................
 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Now that the parser is working, we can move on to evaluating these binding usages.</p><h1 id=evaluation>Evaluation</h1><p>It’s been a while since we covered evaluation, so here’s how it works: binding names and their values are stored in the <em>evaluation environment,</em> or <code>Env</code>. Binding definitions add values to the <code>Env</code>, while binding usages reference these.</p><p>First, a test:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
+</code></pre><p>Now that the parser is working, we can move on to evaluating these binding usages.</p>
+<h1 id=evaluation>Evaluation</h1>
+<p>It’s been a while since we covered evaluation, so here’s how it works: binding names and their values are stored in the <em>evaluation environment,</em> or <code>Env</code>. Binding definitions add values to the <code>Env</code>, while binding usages reference these.</p>
+<p>First, a test:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>val</span>::<span class=n>Val</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -65,14 +114,17 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We create an empty environment, and then declare a binding with the name <code>foo</code> and a value of <code>10</code>. After this, we try evaluating a binding usage of the binding with the name <code>foo</code>, and assert that it gives us <code>10</code>. Notice that the output of <code>.eval(&env)</code> is a <code>Result</code> &ndash; this is because we want to return an appropriate error if the binding does not exist.</p><p>Let’s write the <code>eval</code> method:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We create an empty environment, and then declare a binding with the name <code>foo</code> and a value of <code>10</code>. After this, we try evaluating a binding usage of the binding with the name <code>foo</code>, and assert that it gives us <code>10</code>. Notice that the output of <code>.eval(&env)</code> is a <code>Result</code> &ndash; this is because we want to return an appropriate error if the binding does not exist.</p>
+<p>Let’s write the <code>eval</code> method:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>get_binding_value</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>name</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This calls a hypothetical <code>Env::get_binding_value</code> method, which we can write now:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// env.rs
+</span></code></pre></div><p>This calls a hypothetical <code>Env::get_binding_value</code> method, which we can write now:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// env.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Env</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -84,13 +136,16 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>            </span><span class=p>.</span><span class=n>ok_or_else</span><span class=p>(</span><span class=o>||</span><span class=w> </span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;binding with name ‘{}’ does not exist&#34;</span><span class=p>,</span><span class=w> </span><span class=n>name</span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to use <code>.cloned()</code> because <code>HashMap::get</code> returns a reference to the value, while we want ownership. Keep in mind that using strings for error messages, as we have been doing throughout this series, is unideal &ndash; we’re doing it only because it makes our lives easier for now. Eventually we’ll restructure the project to use custom error enums with <code>Display</code> implementations, but that’s for another day.</p><p>This code doesn’t compile because <code>Val</code> doesn’t implement <code>Clone</code>, so let’s fix that:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// val.rs
+</span></code></pre></div><p>We need to use <code>.cloned()</code> because <code>HashMap::get</code> returns a reference to the value, while we want ownership. Keep in mind that using strings for error messages, as we have been doing throughout this series, is unideal &ndash; we’re doing it only because it makes our lives easier for now. Eventually we’ll restructure the project to use custom error enums with <code>Display</code> implementations, but that’s for another day.</p>
+<p>This code doesn’t compile because <code>Val</code> doesn’t implement <code>Clone</code>, so let’s fix that:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// val.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Val</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=kt>i32</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We should add a test to verify that the error message for trying to evaluate a non-existent binding is correct:</p><div class=highlight><pre class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
+</span></code></pre></div><p>We should add a test to verify that the error message for trying to evaluate a non-existent binding is correct:</p>
+<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -109,8 +164,34 @@ test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And with that, we’re done:</p><pre><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>And with that, we’re done:</p>
+<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 27 tests
 ...........................
 test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>In the next instalment of the series, we’ll add support for blocks.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>This may seem painfully obvious if you haven’t used languages where this isn’t the case. In actuality, though, there are languages where accessing the value of a binding isn’t as simple as writing out the binding’s name: Bash, for example, insists<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup> you prefix the binding’s name with <code>$</code>.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>Yes, I know that the <code>$</code> is needed because Bash has bare words (how else would you tell if something is a usage of a binding or a bare word?), but who doesn’t like making fun of Bash’s syntax? (seriously though, I can never remember the difference (or lack thereof) between <code>if test condition</code>, <code>if [ condition ]</code> and <code>if [[ condition ]]</code>)&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/4/>Part Four: Backtracking</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/6/>Part Six: Blocks</a></div><div style=clear:both></div></nav></body></html>
+</code></pre><p>In the next instalment of the series, we’ll add support for blocks.</p>
+<section class=footnotes role=doc-endnotes>
+<hr>
+<ol>
+<li id=fn:1 role=doc-endnote>
+<p>This may seem painfully obvious if you haven’t used languages where this isn’t the case. In actuality, though, there are languages where accessing the value of a binding isn’t as simple as writing out the binding’s name: Bash, for example, insists<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup> you prefix the binding’s name with <code>$</code>.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+<li id=fn:2 role=doc-endnote>
+<p>Yes, I know that the <code>$</code> is needed because Bash has bare words (how else would you tell if something is a usage of a binding or a bare word?), but who doesn’t like making fun of Bash’s syntax? (seriously though, I can never remember the difference (or lack thereof) between <code>if test condition</code>, <code>if [ condition ]</code> and <code>if [[ condition ]]</code>)&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</main>
+<nav class=page-navigation>
+<div class=prev>
+<p class=hint>Previously</p>
+<a href=https://arzg.github.io/lang/4/>Part Four: Backtracking</a>
+</div>
+<div class=next>
+<p class=hint>Next up</p>
+<a href=https://arzg.github.io/lang/6/>Part Six: Blocks</a>
+</div>
+<div style=clear:both></div>
+</nav>
+</body>
+</html>
