@@ -1,52 +1,13 @@
-<!doctype html><html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Part Thirteen: Whitespace & Events · arzg’s website</title>
-<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
-<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Thirteen: Whitespace & Events · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
-<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
-<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
-<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
-<link rel=manifest href=/site.webmanifest>
-</head>
-<body>
-<nav class=site-navigation>
-<ul>
-<li>
-<a href=/>Home</a>
-</li>
-<li>
-<a href=/blog/>Blog</a>
-</li>
-<li class=current>
-<a href=/lang/>Make A Language</a>
-</li>
-</ul>
-</nav>
-<header class=header-area>
-<h1 class=title>Part Thirteen: Whitespace & Events</h1>
-<section class=page-info>
-<ul>
-<li>9 December 2020</li>
-<li>1758 words</li>
-<li>nine minute read</li>
-</ul>
-</section>
-</header>
-<main><h1 id=the-simple-but-annoying-approach>The simple but annoying approach</h1>
-<p>We could check for the presence of whitespace after every token:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// do some stuff
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Thirteen: Whitespace & Events</h1><section class=page-info><ul><li>9 December 2020</li><li>1758 words</li><li>nine minute read</li></ul></section></header><main><h1 id=the-simple-but-annoying-approach>The simple but annoying approach</h1><p>We could check for the presence of whitespace after every token:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// do some stuff
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>if</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// do some more stuff
-</span></code></pre></div><p>It gets annoying to type that out each time, so we could define a <code>eat_whitespace</code> method:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Only hypothetical; don’t write this!
+</span></code></pre></div><p>It gets annoying to type that out each time, so we could define a <code>eat_whitespace</code> method:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Only hypothetical; don’t write this!
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parser</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eat_whitespace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -55,13 +16,7 @@
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Nevertheless, being forced to write out a <code>p.eat_whitespace()</code> call every single time we add a token to a branch is annoying.</p>
-<h1 id=the-complex-but-invisible-approach>The complex but invisible approach</h1>
-<p>Instead of manually handling whitespace, we can create our own abstraction over Rowan in the form of <em>events</em> &ndash; every time <code>Parser::start_node</code> is called, for example, we’ll push to a <code>Vec</code> of <code>Event</code> enums. The same goes for all the other methods on <code>Parser</code> that interact with Rowan &ndash; each of them gets its own <code>Event</code> enum variant. After we’re done with parsing, we can construct a tree by applying these events to a <code>GreenNodeBuilder</code>. Crucially, it is at this step that we locate the whitespace tokens missing from the parser’s events, allowing us to add them to the syntax tree as necessary. This way we can handle whitespace in one place, divorcing it from the parser.</p>
-<p>Events can make our parser faster if we have a previous parse tree lying around; rather than constructing a new parse tree every time, we can patch an existing one with the events of the new parse. Another benefit that events bring is their decoupling of the parser from the syntax tree implementation. This makes both the parser and especially the syntax tree easier to modify in future. It also gives us the opportunity to share the parser between multiple syntax tree implementations.</p>
-<h1 id=making-our-parser-event-based>Making our parser event-based</h1>
-<p>Let’s start by defining what an event is:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Nevertheless, being forced to write out a <code>p.eat_whitespace()</code> call every single time we add a token to a branch is annoying.</p><h1 id=the-complex-but-invisible-approach>The complex but invisible approach</h1><p>Instead of manually handling whitespace, we can create our own abstraction over Rowan in the form of <em>events</em> &ndash; every time <code>Parser::start_node</code> is called, for example, we’ll push to a <code>Vec</code> of <code>Event</code> enums. The same goes for all the other methods on <code>Parser</code> that interact with Rowan &ndash; each of them gets its own <code>Event</code> enum variant. After we’re done with parsing, we can construct a tree by applying these events to a <code>GreenNodeBuilder</code>. Crucially, it is at this step that we locate the whitespace tokens missing from the parser’s events, allowing us to add them to the syntax tree as necessary. This way we can handle whitespace in one place, divorcing it from the parser.</p><p>Events can make our parser faster if we have a previous parse tree lying around; rather than constructing a new parse tree every time, we can patch an existing one with the events of the new parse. Another benefit that events bring is their decoupling of the parser from the syntax tree implementation. This makes both the parser and especially the syntax tree easier to modify in future. It also gives us the opportunity to share the parser between multiple syntax tree implementations.</p><h1 id=making-our-parser-event-based>Making our parser event-based</h1><p>Let’s start by defining what an event is:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
@@ -69,15 +24,7 @@
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{}</span><span class=w>
-</span></code></pre></div><p>The only things our parser does that could become events are:</p>
-<ul>
-<li>starting nodes</li>
-<li>starting nodes at a given checkpoint</li>
-<li>adding tokens</li>
-<li>finishing nodes</li>
-</ul>
-<p>Let’s add variants to <code>Event</code> for each of these:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>The only things our parser does that could become events are:</p><ul><li>starting nodes</li><li>starting nodes at a given checkpoint</li><li>adding tokens</li><li>finishing nodes</li></ul><p>Let’s add variants to <code>Event</code> for each of these:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
@@ -87,8 +34,7 @@
 </span><span class=w>    </span><span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>text</span>: <span class=nc>SmolStr</span><span class=w> </span><span class=p>},</span><span class=w>
 </span><span class=w>    </span><span class=n>FinishNode</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s now adjust the helper methods on our parser to add events instead of taking action directly. We won’t need the <code>builder</code> field on <code>Parser</code> anymore either:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Let’s now adjust the helper methods on our parser to add events instead of taking action directly. We won’t need the <code>builder</code> field on <code>Parser</code> anymore either:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
@@ -142,8 +88,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that our parser is constructing events instead of a parse tree, we need a way to get a parse tree out of that <code>Vec&lt;Event></code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Now that our parser is constructing events instead of a parse tree, we need a way to get a parse tree out of that <code>Vec&lt;Event></code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -212,9 +157,7 @@
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What we’ve done here is recreate what all those helper methods on <code>Parser</code> did before we modified them to use events; for example, when we encounter the <code>FinishNode</code> event we call <code>self.builder.finish_node()</code>, which is what we did earlier in <code>Parser::finish_node</code>. The code doesn’t compile, though, because the <code>usize</code> that <code>rowan::Checkpoint</code> contains isn’t public, so we can’t create an instance manually. There isn’t any way for us to create a <code>Checkpoint</code>, which means we’ll have to adjust our code to avoid using <code>GreenNodeBuilder::start_node_at</code>.</p>
-<p>Currently we rely on Rowan to wrap all the nodes added since the last call to <code>checkpoint</code>; these nodes are wrapped in the <code>SyntaxKind</code> the event has specified. Rather than doing this, we can instead ‘rewrite history’ by moving the <code>StartNodeAt</code> event to earlier in <code>events</code> where <code>checkpoint</code> was called:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</span></code></pre></div><p>What we’ve done here is recreate what all those helper methods on <code>Parser</code> did before we modified them to use events; for example, when we encounter the <code>FinishNode</code> event we call <code>self.builder.finish_node()</code>, which is what we did earlier in <code>Parser::finish_node</code>. The code doesn’t compile, though, because the <code>usize</code> that <code>rowan::Checkpoint</code> contains isn’t public, so we can’t create an instance manually. There isn’t any way for us to create a <code>Checkpoint</code>, which means we’ll have to adjust our code to avoid using <code>GreenNodeBuilder::start_node_at</code>.</p><p>Currently we rely on Rowan to wrap all the nodes added since the last call to <code>checkpoint</code>; these nodes are wrapped in the <code>SyntaxKind</code> the event has specified. Rather than doing this, we can instead ‘rewrite history’ by moving the <code>StartNodeAt</code> event to earlier in <code>events</code> where <code>checkpoint</code> was called:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, Clone)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -257,11 +200,7 @@
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how we modify a clone of the original <code>events</code> because we can’t mutate something while we’re iterating over it (<a href=https://docs.rs/dtolnay/0.0.9/dtolnay/macro._02__reference_types.html>you can’t obtain a unique borrow to something while a shared borrow is outstanding</a>).</p>
-<h1 id=preparation>Preparation</h1>
-<p>Let’s now get ready to implement automatic consumption of whitespace. The source of lexemes in our parser is currently a <code>Peekable&lt;Lexer&lt;'_>></code>; our sink also needs to have its own copy so that it can reconstruct where the whitespace that is missing from <code>events</code> is located. Creating the <code>Peekable&lt;Lexer&lt;'_>></code> twice would not be ideal, since it would mean unnecessarily lexing the input twice. Instead, we should lex the input just once and collect the results, giving both the parser and the sink a reference to the resulting <code>Vec&lt;(SyntaxKind, &str)></code>.</p>
-<p>The first modification we should make is to create a separate <code>parse</code> function that handles lexing, as well as the creation of the parser as well as the sink:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Note how we modify a clone of the original <code>events</code> because we can’t mutate something while we’re iterating over it (<a href=https://docs.rs/dtolnay/0.0.9/dtolnay/macro._02__reference_types.html>you can’t obtain a unique borrow to something while a shared borrow is outstanding</a>).</p><h1 id=preparation>Preparation</h1><p>Let’s now get ready to implement automatic consumption of whitespace. The source of lexemes in our parser is currently a <code>Peekable&lt;Lexer&lt;'_>></code>; our sink also needs to have its own copy so that it can reconstruct where the whitespace that is missing from <code>events</code> is located. Creating the <code>Peekable&lt;Lexer&lt;'_>></code> twice would not be ideal, since it would mean unnecessarily lexing the input twice. Instead, we should lex the input just once and collect the results, giving both the parser and the sink a reference to the resulting <code>Vec&lt;(SyntaxKind, &str)></code>.</p><p>The first modification we should make is to create a separate <code>parse</code> function that handles lexing, as well as the creation of the parser as well as the sink:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lexemes</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexer</span>::<span class=n>new</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>collect</span><span class=p>();</span><span class=w>
@@ -273,19 +212,16 @@
 </span><span class=w>        </span><span class=n>green_node</span>: <span class=nc>sink</span><span class=p>.</span><span class=n>finish</span><span class=p>(),</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now <code>Parser</code> doesn’t need to be <code>pub</code>, since it’s abstracted over by <code>parse</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Now <code>Parser</code> doesn’t need to be <code>pub</code>, since it’s abstracted over by <code>parse</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>lexer</span>: <span class=nc>Peekable</span><span class=o>&lt;</span><span class=n>Lexer</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>While we’re here we may as well replace <code>lexer</code> with a <code>lexemes</code> field and a <code>cursor</code> to represent what point we’re up to:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>While we’re here we may as well replace <code>lexer</code> with a <code>lexemes</code> field and a <code>cursor</code> to represent what point we’re up to:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)],</span><span class=w>
 </span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have to update some of <code>Parser</code>’s helper functions, as well as its constructor:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We have to update some of <code>Parser</code>’s helper functions, as well as its constructor:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
@@ -320,8 +256,7 @@
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>).</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Next we have to update <code>Sink</code> to hold its own copy of the lexemes:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><p>Next we have to update <code>Sink</code> to hold its own copy of the lexemes:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
@@ -345,8 +280,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Our CLI isn’t compiling because it refers to <code>Parser</code>, which we made private earlier. Let’s replace this reference with our new <code>parse</code> function:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro-cli/src/main.rs
+</span></code></pre></div><p>Our CLI isn’t compiling because it refers to <code>Parser</code>, which we made private earlier. Let’s replace this reference with our new <code>parse</code> function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro-cli/src/main.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parser</span>::<span class=n>parse</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
@@ -369,8 +303,7 @@
 </span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have an unused import in <code>crates/eldiro/src/parser.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>We have an unused import in <code>crates/eldiro/src/parser.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
 </span><span class=w>
@@ -380,8 +313,7 @@
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Finally, the last error remaining is the <code>check</code> function, which we need to update to use <code>parse</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Finally, the last error remaining is the <code>check</code> function, which we need to update to use <code>parse</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_tree</span>: <span class=nc>expect_test</span>::<span class=n>Expect</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=n>expected_tree</span><span class=p>.</span><span class=n>assert_eq</span><span class=p>(</span><span class=o>&amp;</span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
@@ -390,8 +322,7 @@
 running 27 tests
 ...........................
 test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s abstract away the combination of <code>SyntaxKind</code> and <code>&str</code> into its own structure, since the two are frequently being passed together (something called a <a href="https://youtu.be/DC-pQPq0acs?t=521">data clump</a>):</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</code></pre><p>Let’s abstract away the combination of <code>SyntaxKind</code> and <code>&str</code> into its own structure, since the two are frequently being passed together (something called a <a href="https://youtu.be/DC-pQPq0acs?t=521">data clump</a>):</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=nb>Iterator</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Lexer</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>type</span> <span class=nc>Item</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
@@ -493,9 +424,7 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><h1 id=implementation-of-whitespace-skipping>Implementation of whitespace-skipping</h1>
-<p>Now the machinery is in place to have the parser automatically skip whitespace it encounters. Let’s write a test so we know when we get it working:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><h1 id=implementation-of-whitespace-skipping>Implementation of whitespace-skipping</h1><p>Now the machinery is in place to have the parser automatically skip whitespace it encounters. Let’s write a test so we know when we get it working:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -511,8 +440,7 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>All the functions that interact with <code>lexemes</code> need to skip past any whitespace they find. Note that we don’t add events for whitespace; instead, we just ignore it and let the sink take care of it:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>All the functions that interact with <code>lexemes</code> need to skip past any whitespace they find. Note that we don’t add events for whitespace; instead, we just ignore it and let the sink take care of it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -546,8 +474,7 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To make this work we need to update the sink to automatically add any whitespace it encounters. Let’s start by adding a cursor to the sink:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><p>To make this work we need to update the sink to automatically add any whitespace it encounters. Let’s start by adding a cursor to the sink:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span><span class=o>&lt;</span><span class=nb>&#39;static</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
@@ -568,8 +495,7 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s bump this cursor every time a token is added:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Let’s bump this cursor every time a token is added:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>,</span><span class=w> </span><span class=n>SmolStr</span><span class=p>};</span><span class=w>
@@ -598,8 +524,7 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This gives us a compiler error:</p>
-<pre tabindex=0><code class=language-- data-lang=->error[E0382]: borrow of partially moved value: `self`
+</span></code></pre></div><p>This gives us a compiler error:</p><pre tabindex=0><code class=language-- data-lang=->error[E0382]: borrow of partially moved value: `self`
    --&gt; crates/eldiro/src/parser/sink.rs:39:51
     |
 26  |         for (idx, event) in self.events.into_iter().enumerate() {
@@ -614,8 +539,7 @@ note: this function consumes the receiver `self` by taking ownership of it, whic
 232 |     fn into_iter(self) -&gt; Self::IntoIter;
     |                  ^^^^
     = note: partial move occurs because `self.events` has type `Vec&lt;Event&gt;`, which does not implement the `Copy` trait
-</code></pre><p>We can appease the borrow checker by replacing the <code>.into_iter()</code> call with <code>.iter()</code> and sprinkling in a few <code>*</code>s here and there:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>We can appease the borrow checker by replacing the <code>.into_iter()</code> call with <code>.iter()</code> and sprinkling in a few <code>*</code>s here and there:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -633,8 +557,7 @@ note: this function consumes the receiver `self` by taking ownership of it, whic
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that Eldiro is compiling, we can finally get to the interesting part: whitespace skipping. Let’s implement an <code>eat_whitespace</code> method and call it after processing each event:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Now that Eldiro is compiling, we can finally get to the interesting part: whitespace skipping. Let’s implement an <code>eat_whitespace</code> method and call it after processing each event:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -667,8 +590,7 @@ note: this function consumes the receiver `self` by taking ownership of it, whic
 running 28 tests
 ............................
 test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We should write some tests for parsing numbers surrounded by whitespace on different sides, since the only test we currently have related to whitespace only contains whitespace, and nothing else:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</code></pre><p>We should write some tests for parsing numbers surrounded by whitespace on different sides, since the only test we currently have related to whitespace only contains whitespace, and nothing else:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -714,8 +636,7 @@ test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 31 tests
 ...............................
 test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write one more test to make sure whitespace in binary expressions is working:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Let’s write one more test to make sure whitespace in binary expressions is working:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -746,10 +667,7 @@ test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 32 tests
 ................................
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Cool! And there you have it: we’ve managed to implement automatic whitespace skipping without having to touch the actual parser’s code, only the helper methods and sink.</p>
-<h1 id=refactoring>Refactoring</h1>
-<p>It’s ugly how the parser has to manage a cursor that it has to manually advance through the input, skipping whitespace as necessary. Instead, we should extract this into another type; let’s call it <code>Source</code> to stay consistent with <code>Sink</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</code></pre><p>Cool! And there you have it: we’ve managed to implement automatic whitespace skipping without having to touch the actual parser’s code, only the helper methods and sink.</p><h1 id=refactoring>Refactoring</h1><p>It’s ugly how the parser has to manage a cursor that it has to manually advance through the input, skipping whitespace as necessary. Instead, we should extract this into another type; let’s call it <code>Source</code> to stay consistent with <code>Sink</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
@@ -771,8 +689,7 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w>
 </span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s update <code>Parser</code> to use <code>Source</code> with the API we wish we had; this way we avoid the common pitfall of writing an API, trying to use it, only to find that it needs to be changed:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Let’s update <code>Parser</code> to use <code>Source</code> with the API we wish we had; this way we avoid the common pitfall of writing an API, trying to use it, only to find that it needs to be changed:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>source</span>: <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
@@ -804,8 +721,7 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>source</span><span class=p>.</span><span class=n>peek_kind</span><span class=p>()</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’ve removed the <code>lexemes</code> and <code>cursor</code> fields and their references from <code>Parser</code>. These have been replaced by calls to methods on <code>Source</code>, plus a few minor changes that these modifications require. Let’s implement the missing methods on <code>Source</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
+</span></code></pre></div><p>We’ve removed the <code>lexemes</code> and <code>cursor</code> fields and their references from <code>Parser</code>. These have been replaced by calls to methods on <code>Source</code>, plus a few minor changes that these modifications require. Let’s implement the missing methods on <code>Source</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
 </span><span class=w>
@@ -842,23 +758,8 @@ test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The code here is almost identical to that of <code>Parser</code>’s helper methods prior to the change we made to them just a moment ago.</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>The code here is almost identical to that of <code>Parser</code>’s helper methods prior to the change we made to them just a moment ago.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 32 tests
 ................................
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Thank you for reading to the end! In the next part we’ll add support for comments.</p>
-</main>
-<nav class=page-navigation>
-<div class=prev>
-<p class=hint>Previously</p>
-<a href=https://arzg.github.io/lang/12/>Part Twelve: Terminology</a>
-</div>
-<div class=next>
-<p class=hint>Next up</p>
-<a href=https://arzg.github.io/lang/14/>Part Fourteen: Comments</a>
-</div>
-<div style=clear:both></div>
-</nav>
-</body>
-</html>
+</code></pre><p>Thank you for reading to the end! In the next part we’ll add support for comments.</p></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/12/>Part Twelve: Terminology</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/14/>Part Fourteen: Comments</a></div><div style=clear:both></div></nav></body></html>

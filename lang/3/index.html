@@ -1,53 +1,10 @@
-<!doctype html><html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Part Three: Defining Variables · arzg’s website</title>
-<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
-<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Three: Defining Variables · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
-<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
-<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
-<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
-<link rel=manifest href=/site.webmanifest>
-</head>
-<body>
-<nav class=site-navigation>
-<ul>
-<li>
-<a href=/>Home</a>
-</li>
-<li>
-<a href=/blog/>Blog</a>
-</li>
-<li class=current>
-<a href=/lang/>Make A Language</a>
-</li>
-</ul>
-</nav>
-<header class=header-area>
-<h1 class=title>Part Three: Defining Variables</h1>
-<section class=page-info>
-<ul>
-<li>9 September 2020</li>
-<li>1557 words</li>
-<li>eight minute read</li>
-</ul>
-</section>
-</header>
-<main><p>Welcome back! This time, we’ll parse and evaluate variable definitions.</p>
-<h1 id=parsing>Parsing</h1>
-<p>Before we can begin writing a parser, we need to decide on a syntax. Since we like Rust, we’ll go for a similar syntax:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>5</span><span class=w>
-</span></code></pre></div><p>To start off, Eldiro will only include immutable variables, or <em>bindings,</em><sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> as they’re sometimes called (at least that’s what I’ll be calling them for the rest of this series).</p>
-<p>Although we’d usually start writing a test here, I fear that <code>lib.rs</code> will become too cluttered. To ameliorate this, we’ll move <code>lib.rs</code> to <code>expr.rs</code>, remove <code>mod utils;</code> from <code>expr.rs</code>, and put the following in <code>lib.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Three: Defining Variables</h1><section class=page-info><ul><li>9 September 2020</li><li>1557 words</li><li>eight minute read</li></ul></section></header><main><p>Welcome back! This time, we’ll parse and evaluate variable definitions.</p><h1 id=parsing>Parsing</h1><p>Before we can begin writing a parser, we need to decide on a syntax. Since we like Rust, we’ll go for a similar syntax:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>5</span><span class=w>
+</span></code></pre></div><p>To start off, Eldiro will only include immutable variables, or <em>bindings,</em><sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup> as they’re sometimes called (at least that’s what I’ll be calling them for the rest of this series).</p><p>Although we’d usually start writing a test here, I fear that <code>lib.rs</code> will become too cluttered. To ameliorate this, we’ll move <code>lib.rs</code> to <code>expr.rs</code>, remove <code>mod utils;</code> from <code>expr.rs</code>, and put the following in <code>lib.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>utils</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>We also need to import <code>crate::utils</code> in <code>expr.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Now we can start writing a test. Open <code>lib.rs</code> and add <code>pub mod binding_def;</code> to the top, and open up <code>src/binding_def.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>Expr</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>We also need to import <code>crate::utils</code> in <code>expr.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Now we can start writing a test. Open <code>lib.rs</code> and add <code>pub mod binding_def;</code> to the top, and open up <code>src/binding_def.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>Expr</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -84,8 +41,7 @@
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s implement the <code>BindingDef</code> parser:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Let’s implement the <code>BindingDef</code> parser:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -119,9 +75,7 @@
 </span><span class=w>        </span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We start by checking if the input starts with <code>let</code>; if it does, we strip it off and continue. If it doesn’t, we panic. Next, we strip off whitespace. After this, we extract an identifier using a function we haven’t defined yet, and strip off whitespace. Next, we follow the same pattern we used to strip off the <code>let</code>, but instead this time with <code>=</code>. Finally, we strip off whitespace yet again and can parse an expression from the remaining input.</p>
-<p>Although the panicking isn’t pretty, it’s good enough for this tutorial. The repetition, on the other hand, isn’t. Before we get too ahead of ourselves, we should implement <code>utils::extract_ident</code>, though:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
+</span></code></pre></div><p>We start by checking if the input starts with <code>let</code>; if it does, we strip it off and continue. If it doesn’t, we panic. Next, we strip off whitespace. After this, we extract an identifier using a function we haven’t defined yet, and strip off whitespace. Next, we follow the same pattern we used to strip off the <code>let</code>, but instead this time with <code>=</code>. Finally, we strip off whitespace yet again and can parse an expression from the remaining input.</p><p>Although the panicking isn’t pretty, it’s good enough for this tutorial. The repetition, on the other hand, isn’t. Before we get too ahead of ourselves, we should implement <code>utils::extract_ident</code>, though:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_ident</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=p>.</span><span class=n>is_ascii_alphabetic</span><span class=p>(),</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
@@ -136,8 +90,7 @@
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_ident</span><span class=p>(</span><span class=s>&#34;abcdEFG stop&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34; stop&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;abcdEFG&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Easy enough! But what if we want our identifiers to contain numbers?</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_ident</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Easy enough! But what if we want our identifiers to contain numbers?</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_ident</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// Notice this is now alphanumeric instead of alphabetic
 </span><span class=c1></span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=p>.</span><span class=n>is_ascii_alphanumeric</span><span class=p>(),</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
@@ -151,12 +104,9 @@
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_ident</span><span class=p>(</span><span class=s>&#34;foobar1()&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;()&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;foobar1&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Fortunately, this works. It has one problem, though: what if we’re in a situation where either a number or an identifier is permissible? For example, both of the following will work once Eldiro becomes more developed:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>10</span><span class=w>       </span><span class=err>#</span><span class=w> </span><span class=n>numbers</span><span class=w>
+</span></code></pre></div><p>Fortunately, this works. It has one problem, though: what if we’re in a situation where either a number or an identifier is permissible? For example, both of the following will work once Eldiro becomes more developed:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>a</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=mi>10</span><span class=w>       </span><span class=err>#</span><span class=w> </span><span class=n>numbers</span><span class=w>
 </span><span class=w></span><span class=kd>let</span><span class=w> </span><span class=n>n</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>a</span><span class=w>        </span><span class=err>#</span><span class=w> </span><span class=n>identifier</span><span class=w>
-</span></code></pre></div><p>A number or an identifier works in the same place.</p>
-<p>The problem is that <code>extract_ident</code> allows <em>all</em> characters of the identifier to be numbers, thereby allowing the mistaken treatment of numbers as identifiers. It is for this reason that many programming languages (Rust and C included) don’t allow identifiers to start with a number; Eldiro should follow in their footsteps. Luckily, this is pretty easy to implement:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_ident</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>A number or an identifier works in the same place.</p><p>The problem is that <code>extract_ident</code> allows <em>all</em> characters of the identifier to be numbers, thereby allowing the mistaken treatment of numbers as identifiers. It is for this reason that many programming languages (Rust and C included) don’t allow identifiers to start with a number; Eldiro should follow in their footsteps. Luckily, this is pretty easy to implement:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_ident</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>input_starts_with_alphabetic</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>chars</span><span class=p>()</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>next</span><span class=p>()</span><span class=w>
@@ -179,9 +129,7 @@
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_ident</span><span class=p>(</span><span class=s>&#34;123abc&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;123abc&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;&#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how we try to extract the identifier in the test, but the entire input is returned as leftover, meaning the parser didn’t consume anything. This matches what we wrote on the second-last line of <code>extract_ident</code>’s definition: if the input doesn’t start with an alphabetic character, then we know we won’t be able to parse an identifier and can just give up by not consuming anything.</p>
-<p>Now that we have <code>utils::extract_ident</code> working, we can move on to the next problem: the duplication of logic in <code>BindingDef::new</code>. Here’s the current code of that function for a quick refresher:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Note how we try to extract the identifier in the test, but the entire input is returned as leftover, meaning the parser didn’t consume anything. This matches what we wrote on the second-last line of <code>extract_ident</code>’s definition: if the input doesn’t start with an alphabetic character, then we know we won’t be able to parse an identifier and can just give up by not consuming anything.</p><p>Now that we have <code>utils::extract_ident</code> working, we can move on to the next problem: the duplication of logic in <code>BindingDef::new</code>. Here’s the current code of that function for a quick refresher:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>starts_with</span><span class=p>(</span><span class=s>&#34;let&#34;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>            </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=mi>3</span><span class=p>..]</span><span class=w>
@@ -211,14 +159,7 @@
 </span><span class=w>        </span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>For both <code>let</code> and <code>=</code> we follow the same pattern:</p>
-<ol>
-<li>Check if the input starts with the desired text</li>
-<li>If it does, return the input with the desired text chopped off</li>
-<li>If it doesn’t, panic</li>
-</ol>
-<p>This can be abstracted away into a function, which we should definitely do since we’ll be using it a lot.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup> Inspired by the <a href=https://github.com/Geal/nom>Nom parsing library</a>,<sup id=fnref:3><a href=#fn:3 class=footnote-ref role=doc-noteref>3</a></sup> we’ll call this function <code>tag</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
+</span></code></pre></div><p>For both <code>let</code> and <code>=</code> we follow the same pattern:</p><ol><li>Check if the input starts with the desired text</li><li>If it does, return the input with the desired text chopped off</li><li>If it doesn’t, panic</li></ol><p>This can be abstracted away into a function, which we should definitely do since we’ll be using it a lot.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup> Inspired by the <a href=https://github.com/Geal/nom>Nom parsing library</a>,<sup id=fnref:3><a href=#fn:3 class=footnote-ref role=doc-noteref>3</a></sup> we’ll call this function <code>tag</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>tag</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=p>,</span><span class=w> </span><span class=na>&#39;b</span><span class=o>&gt;</span><span class=p>(</span><span class=n>starting_text</span>: <span class=kp>&amp;</span><span class=na>&#39;a</span><span class=w> </span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=na>&#39;b</span><span class=w> </span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kp>&amp;</span><span class=na>&#39;b</span><span class=w> </span><span class=kt>str</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>starts_with</span><span class=p>(</span><span class=n>starting_text</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -237,9 +178,7 @@
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>tag</span><span class=p>(</span><span class=s>&#34;let&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;let a&#34;</span><span class=p>),</span><span class=w> </span><span class=s>&#34; a&#34;</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Those lifetimes on <code>tag</code> might look scary, but all they’re doing is telling Rust that the lifetimes of <code>s</code> and the output are related, while the lifetimes of <code>starting_text</code> and the output aren’t. If we didn’t have the lifetimes, Rust wouldn’t know if the returned value has to live as long as <code>starting_text</code>, or <code>s</code>, or both.</p>
-<p>With <code>tag</code> working, let’s go back to <code>BindingDef::new</code> and refactor it to use our new function:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Those lifetimes on <code>tag</code> might look scary, but all they’re doing is telling Rust that the lifetimes of <code>s</code> and the output are related, while the lifetimes of <code>starting_text</code> and the output aren’t. If we didn’t have the lifetimes, Rust wouldn’t know if the returned value has to live as long as <code>starting_text</code>, or <code>s</code>, or both.</p><p>With <code>tag</code> working, let’s go back to <code>BindingDef::new</code> and refactor it to use our new function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;let&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>);</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
@@ -261,8 +200,7 @@
 </span><span class=w>        </span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now for the moment of truth:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t
+</span></code></pre></div><p>Now for the moment of truth:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t
 running 21 tests
 test expr::tests::parse_add_op ... ok
 test expr::tests::parse_div_op ... ok
@@ -287,57 +225,45 @@ test utils::tests::tag_word ... ok
 test utils::tests::extract_star ... ok
 
 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Huzzah! That output is getting a little long, though, so let’s rerun with <code>--quiet</code>, or <code>-q</code> for short:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Huzzah! That output is getting a little long, though, so let’s rerun with <code>--quiet</code>, or <code>-q</code> for short:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 21 tests
 .....................
 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Much better. Now that we can parse binding definitions, we need to evaluate them.</p>
-<h1 id=evaluation>Evaluation</h1>
-<p>Up to now, all we’ve done is parsing. Now it’s time for something different: evaluation. Since Eldiro doesn’t at the moment have a way to access the value of bindings (we haven’t parsed binding usages yet), and can only define new bindings, we need to worry solely about the problem of storing bindings. Of course, we will eventually add a way to get the value of a binding, but we’ll worry about that when we get to it.</p>
-<p>Imagine that Eldiro had the ability to access the value of bindings; how would binding storage work? If we have a binding definition <code>let a = 2 + 2</code>, and later use it by typing <code>a</code>, how can we figure out what the value of the usage is? When we’re evaluating the binding usage, we know that a binding is in scope with the name <code>a</code> and a value of <code>4</code>. We also know that we’re trying to use a binding with the name <code>a</code>. To me, this sounds like a job for a <code>HashMap</code> (also known as a ‘dictionary’ or ‘map’ in other languages). A <code>HashMap</code> allows you to store values, associating them with a key. Given that same key, you can later extract the value associated with that key. In this case, the keys are binding names (<code>String</code>s), and the values are … well, we’ll see.</p>
-<p>Traditionally, all the context needed to evaluate code is called an <em>environment.</em> Let’s define one. Add the module declaration to <code>lib.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>binding_def</span><span class=p>;</span><span class=w>
+</code></pre><p>Much better. Now that we can parse binding definitions, we need to evaluate them.</p><h1 id=evaluation>Evaluation</h1><p>Up to now, all we’ve done is parsing. Now it’s time for something different: evaluation. Since Eldiro doesn’t at the moment have a way to access the value of bindings (we haven’t parsed binding usages yet), and can only define new bindings, we need to worry solely about the problem of storing bindings. Of course, we will eventually add a way to get the value of a binding, but we’ll worry about that when we get to it.</p><p>Imagine that Eldiro had the ability to access the value of bindings; how would binding storage work? If we have a binding definition <code>let a = 2 + 2</code>, and later use it by typing <code>a</code>, how can we figure out what the value of the usage is? When we’re evaluating the binding usage, we know that a binding is in scope with the name <code>a</code> and a value of <code>4</code>. We also know that we’re trying to use a binding with the name <code>a</code>. To me, this sounds like a job for a <code>HashMap</code> (also known as a ‘dictionary’ or ‘map’ in other languages). A <code>HashMap</code> allows you to store values, associating them with a key. Given that same key, you can later extract the value associated with that key. In this case, the keys are binding names (<code>String</code>s), and the values are … well, we’ll see.</p><p>Traditionally, all the context needed to evaluate code is called an <em>environment.</em> Let’s define one. Add the module declaration to <code>lib.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>binding_def</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>utils</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>And create and open <code>src/env.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>collections</span>::<span class=n>HashMap</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>And create and open <code>src/env.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>collections</span>::<span class=n>HashMap</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>bindings</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=o>???&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What do we put where the question marks are? Well, that’s the type of the value of a binding. At the moment Eldiro only supports expressions with numbers, but we’ll add support for all kinds of data types later. To make these future enhancements easier, we can declare Eldiro <em>values</em> as an enum with variants for each data type. We’ll need another module for this:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span></code></pre></div><p>What do we put where the question marks are? Well, that’s the type of the value of a binding. At the moment Eldiro only supports expressions with numbers, but we’ll add support for all kinds of data types later. To make these future enhancements easier, we can declare Eldiro <em>values</em> as an enum with variants for each data type. We’ll need another module for this:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>binding_def</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>val</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>utils</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>And in <code>src/val.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>And in <code>src/val.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Val</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=kt>i32</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s head back over to <code>env.rs</code> so we can use <code>Val</code> as the value type of our bindings <code>HashMap</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>val</span>::<span class=n>Val</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Let’s head back over to <code>env.rs</code> so we can use <code>Val</code> as the value type of our bindings <code>HashMap</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>val</span>::<span class=n>Val</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>collections</span>::<span class=n>HashMap</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>bindings</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>Val</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>All that’s left is a way for code outside of the <code>env</code> module to insert bindings:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Env</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>All that’s left is a way for code outside of the <code>env</code> module to insert bindings:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Env</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>store_binding</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>val</span>: <span class=nc>Val</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>bindings</span><span class=p>.</span><span class=n>insert</span><span class=p>(</span><span class=n>name</span><span class=p>,</span><span class=w> </span><span class=n>val</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Well, that was easy! Let’s go back to <code>binding_def.rs</code> to add an <code>eval</code> method to <code>BindingDef</code> that calls <code>Env::store_binding</code> for us:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Well, that was easy! Let’s go back to <code>binding_def.rs</code> to add an <code>eval</code> method to <code>BindingDef</code> that calls <code>Env::store_binding</code> for us:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -348,8 +274,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>store_binding</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>name</span><span class=p>.</span><span class=n>clone</span><span class=p>(),</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>val</span><span class=p>.</span><span class=n>eval</span><span class=p>());</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This stores in the environment a binding with the <em>name</em> of the <code>BindingDef</code> we’re evaluating (the <code>bar</code> in <code>let bar = 2 * 10</code>). The value of the new binding we’re storing is the <em>value</em> of the <code>BindingDef</code> we’re evaluating (the <code>2 * 10</code> in <code>let bar = 2 * 10</code>). There’s an issue with this code, though: it calls a non-existent method <code>eval</code> on <code>self.val</code> (which is of type <code>Expr</code>); we should implement it:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>This stores in the environment a binding with the <em>name</em> of the <code>BindingDef</code> we’re evaluating (the <code>bar</code> in <code>let bar = 2 * 10</code>). The value of the new binding we’re storing is the <em>value</em> of the <code>BindingDef</code> we’re evaluating (the <code>2 * 10</code> in <code>let bar = 2 * 10</code>). There’s an issue with this code, though: it calls a non-existent method <code>eval</code> on <code>self.val</code> (which is of type <code>Expr</code>); we should implement it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>val</span>::<span class=n>Val</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// snip
@@ -371,8 +296,7 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>Val</span>::<span class=n>Number</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This method first extracts the numeric values of the left-hand side and right-hand sides of the expression, and then, depending on the operator, completes the needed calculation. To make sure <code>Expr::eval</code> is working, we should add some tests:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>This method first extracts the numeric values of the left-hand side and right-hand sides of the expression, and then, depending on the operator, completes the needed calculation. To make sure <code>Expr::eval</code> is working, we should add some tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -428,39 +352,9 @@ test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s see if it works:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>Let’s see if it works:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 // lots of warnings
 running 25 tests
 .........................
 test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Great!</p>
-<p>Next time around, we’ll allow Eldiro’s <code>Expr</code>s to be just numbers by themselves, without requiring that everything is a mathematical operation (so <code>let foo = 100</code> will work). This might sound trivial, but it actually requires some significant changes across the project.</p>
-<section class=footnotes role=doc-endnotes>
-<hr>
-<ol>
-<li id=fn:1 role=doc-endnote>
-<p>A <em>var</em>iable that you can’t <em>var</em>y doesn’t make much sense.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-<li id=fn:2 role=doc-endnote>
-<p>Anywhere where you know you’ll see a given string, the function will be used. Examples include all keywords, parentheses, and some operators.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-<li id=fn:3 role=doc-endnote>
-<p>In case you haven’t used Nom before, all the functions in <code>util</code> are loosely modelled off Nom. I decided against directly using Nom because I think it’s easier to understand when you write all the code yourself. In some cases this is impractical, but for something this simple I think the tradeoff is worth it.&#160;<a href=#fnref:3 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-</ol>
-</section>
-</main>
-<nav class=page-navigation>
-<div class=prev>
-<p class=hint>Previously</p>
-<a href=https://arzg.github.io/lang/2/>Part Two: Whitespace Support</a>
-</div>
-<div class=next>
-<p class=hint>Next up</p>
-<a href=https://arzg.github.io/lang/4/>Part Four: Backtracking</a>
-</div>
-<div style=clear:both></div>
-</nav>
-</body>
-</html>
+</code></pre><p>Great!</p><p>Next time around, we’ll allow Eldiro’s <code>Expr</code>s to be just numbers by themselves, without requiring that everything is a mathematical operation (so <code>let foo = 100</code> will work). This might sound trivial, but it actually requires some significant changes across the project.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>A <em>var</em>iable that you can’t <em>var</em>y doesn’t make much sense.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>Anywhere where you know you’ll see a given string, the function will be used. Examples include all keywords, parentheses, and some operators.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:3 role=doc-endnote><p>In case you haven’t used Nom before, all the functions in <code>util</code> are loosely modelled off Nom. I decided against directly using Nom because I think it’s easier to understand when you write all the code yourself. In some cases this is impractical, but for something this simple I think the tradeoff is worth it.&#160;<a href=#fnref:3 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/2/>Part Two: Whitespace Support</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/4/>Part Four: Backtracking</a></div><div style=clear:both></div></nav></body></html>

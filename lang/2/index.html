@@ -1,44 +1,6 @@
-<!doctype html><html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Part Two: Whitespace Support · arzg’s website</title>
-<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
-<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Two: Whitespace Support · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
-<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
-<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
-<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
-<link rel=manifest href=/site.webmanifest>
-</head>
-<body>
-<nav class=site-navigation>
-<ul>
-<li>
-<a href=/>Home</a>
-</li>
-<li>
-<a href=/blog/>Blog</a>
-</li>
-<li class=current>
-<a href=/lang/>Make A Language</a>
-</li>
-</ul>
-</nav>
-<header class=header-area>
-<h1 class=title>Part Two: Whitespace Support</h1>
-<section class=page-info>
-<ul>
-<li>9 September 2020</li>
-<li>271 words</li>
-<li>one minute read</li>
-</ul>
-</section>
-</header>
-<main><p>Last time, we made a parser for simple unnested mathematical expressions, such as <code>1+1</code> or <code>3*4</code>. In this post, we’ll add support for whitespace (so that users of Eldiro will be able to use <code>2 + 2</code> instead of <code>2+2</code>).</p>
-<p>We can achieve this by creating an <code>extract_whitespace</code> function similar to <code>extract_digits</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Two: Whitespace Support</h1><section class=page-info><ul><li>9 September 2020</li><li>271 words</li><li>one minute read</li></ul></section></header><main><p>Last time, we made a parser for simple unnested mathematical expressions, such as <code>1+1</code> or <code>3*4</code>. In this post, we’ll add support for whitespace (so that users of Eldiro will be able to use <code>2 + 2</code> instead of <code>2+2</code>).</p><p>We can achieve this by creating an <code>extract_whitespace</code> function similar to <code>extract_digits</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=c1>// Let’s copy-paste from extract_digits
 </span><span class=c1></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_whitespace</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -61,10 +23,8 @@
 </span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>extract_whitespace</span><span class=p>(</span><span class=s>&#34;    1&#34;</span><span class=p>),</span><span class=w> </span><span class=p>(</span><span class=s>&#34;1&#34;</span><span class=p>,</span><span class=w> </span><span class=s>&#34;    &#34;</span><span class=p>));</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Although this <em>does</em> indeed work, it involves quite a bit of repetition. What if we want a similar function for, say, extracting variable names? Instead of copy-pasting <code>extract_digits</code> yet again, we can define a <code>take_while</code> function with the following signature:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w>
-</span></code></pre></div><p><code>take_while</code> takes a function called <code>accept</code> that determines whether to accept a given character or not. Once it encounters a character that is not accepted, it stops consuming characters and returns.</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Although this <em>does</em> indeed work, it involves quite a bit of repetition. What if we want a similar function for, say, extracting variable names? Instead of copy-pasting <code>extract_digits</code> yet again, we can define a <code>take_while</code> function with the following signature:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w>
+</span></code></pre></div><p><code>take_while</code> takes a function called <code>accept</code> that determines whether to accept a given character or not. Once it encounters a character that is not accepted, it stops consuming characters and returns.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w>
 </span><span class=w>        </span><span class=p>.</span><span class=n>find_map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>accept</span><span class=p>(</span><span class=n>c</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>None</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span><span class=w> </span><span class=p>})</span><span class=w>
@@ -74,17 +34,14 @@
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>extracted_end</span><span class=p>..];</span><span class=w>
 </span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>extracted</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now redefine <code>extract_digits</code> and <code>extract_whitespace</code> in terms of <code>take_while</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We can now redefine <code>extract_digits</code> and <code>extract_whitespace</code> in terms of <code>take_while</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_digits</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=p>.</span><span class=n>is_ascii_digit</span><span class=p>(),</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>extract_whitespace</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=sc>&#39; &#39;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And our tests still pass!</p>
-<p>To actually allow whitespace inside expressions, we can call <code>extract_whitespace</code> while throwing away the output:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span></code></pre></div><p>And our tests still pass!</p><p>To actually allow whitespace inside expressions, we can call <code>extract_whitespace</code> while throwing away the output:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -119,19 +76,4 @@
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note that we aren’t using <code>let _ = utils::extract_whitespace(s)</code>, as that would throw away the <code>s</code> that we get back, thereby not progressing through the input. Instead, by using <code>let (s, _) = ...</code> we keep advancing, but throw away the actual whitespace we extracted.</p>
-<p>In the next post, Eldiro will gain the ability to create variables. This involves both parsing, as well as the beginnings of an interpreter.</p>
-</main>
-<nav class=page-navigation>
-<div class=prev>
-<p class=hint>Previously</p>
-<a href=https://arzg.github.io/lang/1/>Part One: A Basic Parser</a>
-</div>
-<div class=next>
-<p class=hint>Next up</p>
-<a href=https://arzg.github.io/lang/3/>Part Three: Defining Variables</a>
-</div>
-<div style=clear:both></div>
-</nav>
-</body>
-</html>
+</span></code></pre></div><p>Note that we aren’t using <code>let _ = utils::extract_whitespace(s)</code>, as that would throw away the <code>s</code> that we get back, thereby not progressing through the input. Instead, by using <code>let (s, _) = ...</code> we keep advancing, but throw away the actual whitespace we extracted.</p><p>In the next post, Eldiro will gain the ability to create variables. This involves both parsing, as well as the beginnings of an interpreter.</p></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/1/>Part One: A Basic Parser</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/3/>Part Three: Defining Variables</a></div><div style=clear:both></div></nav></body></html>

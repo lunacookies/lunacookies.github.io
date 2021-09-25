@@ -1,83 +1,31 @@
-<!doctype html><html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Part Eight: Function Definitions · arzg’s website</title>
-<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
-<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Eight: Function Definitions · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
-<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
-<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
-<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
-<link rel=manifest href=/site.webmanifest>
-</head>
-<body>
-<nav class=site-navigation>
-<ul>
-<li>
-<a href=/>Home</a>
-</li>
-<li>
-<a href=/blog/>Blog</a>
-</li>
-<li class=current>
-<a href=/lang/>Make A Language</a>
-</li>
-</ul>
-</nav>
-<header class=header-area>
-<h1 class=title>Part Eight: Function Definitions</h1>
-<section class=page-info>
-<ul>
-<li>8 October 2020</li>
-<li>3488 words</li>
-<li>17 minute read</li>
-</ul>
-</section>
-</header>
-<main><p>First, we need to decide on a syntax. Let’s start with Rust’s syntax:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>frobnicate</span><span class=p>(</span><span class=n>foo</span>: <span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>bar</span>: <span class=nb>String</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Bar</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Eight: Function Definitions</h1><section class=page-info><ul><li>8 October 2020</li><li>3488 words</li><li>17 minute read</li></ul></section></header><main><p>First, we need to decide on a syntax. Let’s start with Rust’s syntax:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>frobnicate</span><span class=p>(</span><span class=n>foo</span>: <span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>bar</span>: <span class=nb>String</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Bar</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=p>...</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Eldiro doesn’t have types (yet), so we need to remove those:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p>
-<pre tabindex=0><code>fn frobnicate(foo, bar) {
+</span></code></pre></div><p>Eldiro doesn’t have types (yet), so we need to remove those:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><pre tabindex=0><code>fn frobnicate(foo, bar) {
     ...
 }
-</code></pre><p>Parentheses and commas are annoying, so let’s get rid of those:</p>
-<pre tabindex=0><code>fn frobnicate foo bar {
+</code></pre><p>Parentheses and commas are annoying, so let’s get rid of those:</p><pre tabindex=0><code>fn frobnicate foo bar {
     ...
 }
-</code></pre><p>Often we have functions whose body is just a single statement. Here’s a contrived example:</p>
-<pre tabindex=0><code>fn add x y {
+</code></pre><p>Often we have functions whose body is just a single statement. Here’s a contrived example:</p><pre tabindex=0><code>fn add x y {
     x + y
 }
-</code></pre><p>It can be convenient to not force function bodies to be blocks in these cases. Using <a href=https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/statements-expressions-operators/expression-bodied-members#methods>the syntax from C#</a>:</p>
-<pre tabindex=0><code>fn add x y =&gt; x + y
-</code></pre><p>Since blocks are expressions (which are statements), we can also do this:</p>
-<pre tabindex=0><code>fn add x y =&gt; {
+</code></pre><p>It can be convenient to not force function bodies to be blocks in these cases. Using <a href=https://docs.microsoft.com/en-us/dotnet/csharp/programming-guide/statements-expressions-operators/expression-bodied-members#methods>the syntax from C#</a>:</p><pre tabindex=0><code>fn add x y =&gt; x + y
+</code></pre><p>Since blocks are expressions (which are statements), we can also do this:</p><pre tabindex=0><code>fn add x y =&gt; {
     x + y
 }
-</code></pre><p>To reduce the number of ways to do one thing, we’ll remove the ‘block-only’ syntax, instead forcing the use of the <code>=></code> everywhere.</p>
-<h1 id=why-not-use-closures-for-everything>Why not use closures for everything?</h1>
-<p>In the past I would have preferred for all function definitions to be binding definitions whose value is a closure. Here’s an example in Rust:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Function-specific syntax
+</code></pre><p>To reduce the number of ways to do one thing, we’ll remove the ‘block-only’ syntax, instead forcing the use of the <code>=></code> everywhere.</p><h1 id=why-not-use-closures-for-everything>Why not use closures for everything?</h1><p>In the past I would have preferred for all function definitions to be binding definitions whose value is a closure. Here’s an example in Rust:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Function-specific syntax
 </span><span class=c1></span><span class=k>fn</span> <span class=nf>add</span><span class=p>(</span><span class=n>x</span>: <span class=kt>i32</span><span class=p>,</span><span class=w> </span><span class=n>y</span>: <span class=kt>i32</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>i32</span> <span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>x</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>y</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=c1>// More general closure syntax
 </span><span class=c1></span><span class=kd>let</span><span class=w> </span><span class=n>add</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>|</span><span class=n>x</span>: <span class=kt>i32</span><span class=p>,</span><span class=w> </span><span class=n>y</span>: <span class=kt>i32</span><span class=o>|</span><span class=w> </span>-&gt; <span class=kt>i32</span> <span class=p>{</span><span class=w> </span><span class=n>x</span><span class=w> </span><span class=o>+</span><span class=w> </span><span class=n>y</span><span class=w> </span><span class=p>};</span><span class=w>
-</span></code></pre></div><p><a href="https://www.reddit.com/r/rust/comments/inoipw/something_that_blew_my_mind_about_scoped_variables/g4dd0ul?utm_source=share&utm_medium=web2x&context=3">A comment from u/witty___name</a> clarified that this approach is problematic, though. (I’ll be paraphrasing their explanation here.)</p>
-<p>Eldiro doesn’t have any way to catch undefined functions until runtime at the moment, which means that this approach works fine, even with recursion. However, if Eldiro gains a way to check for undefined functions <em>without running the program,</em> then using closures for function definitions exclusively would lead to problems. Consider this closure definition in Rust:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>overflow_stack</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=n>overflow_stack</span><span class=p>();</span><span class=w>
-</span></code></pre></div><p>This doesn’t compile, since bindings aren’t in scope on their left-hand side. If they were, it would allow things like</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>x</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>x</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>which is clearly nonsensical.</p>
-<p>Because of this, I’ve chosen for function definitions to have a dedicated syntax in Eldiro.</p>
-<h1 id=parsing>Parsing</h1>
-<p>Let’s get started on the parser. Function definitions aren’t an expression &ndash; they’re a statement, so let’s go to <code>stmt.rs</code> and add a variant to that enum:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>binding_def</span>::<span class=n>BindingDef</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p><a href="https://www.reddit.com/r/rust/comments/inoipw/something_that_blew_my_mind_about_scoped_variables/g4dd0ul?utm_source=share&utm_medium=web2x&context=3">A comment from u/witty___name</a> clarified that this approach is problematic, though. (I’ll be paraphrasing their explanation here.)</p><p>Eldiro doesn’t have any way to catch undefined functions until runtime at the moment, which means that this approach works fine, even with recursion. However, if Eldiro gains a way to check for undefined functions <em>without running the program,</em> then using closures for function definitions exclusively would lead to problems. Consider this closure definition in Rust:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>overflow_stack</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>||</span><span class=w> </span><span class=n>overflow_stack</span><span class=p>();</span><span class=w>
+</span></code></pre></div><p>This doesn’t compile, since bindings aren’t in scope on their left-hand side. If they were, it would allow things like</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=kd>let</span><span class=w> </span><span class=n>x</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>x</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>which is clearly nonsensical.</p><p>Because of this, I’ve chosen for function definitions to have a dedicated syntax in Eldiro.</p><h1 id=parsing>Parsing</h1><p>Let’s get started on the parser. Function definitions aren’t an expression &ndash; they’re a statement, so let’s go to <code>stmt.rs</code> and add a variant to that enum:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>binding_def</span>::<span class=n>BindingDef</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>Expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>func_def</span>::<span class=n>FuncDef</span><span class=p>;</span><span class=w>
@@ -91,8 +39,7 @@
 </span><span class=w>    </span><span class=n>FuncDef</span><span class=p>(</span><span class=n>FuncDef</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To get our project compiling as quickly as possible, let’s add a case for <code>Stmt::FuncDef</code> to <code>Stmt::eval</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>To get our project compiling as quickly as possible, let’s add a case for <code>Stmt::FuncDef</code> to <code>Stmt::eval</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -106,8 +53,7 @@
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s add a test, too:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s add a test, too:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=p>{</span><span class=n>BindingUsage</span><span class=p>,</span><span class=w> </span><span class=n>Number</span><span class=p>,</span><span class=w> </span><span class=n>Op</span><span class=p>};</span><span class=w>
@@ -133,8 +79,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p><code>BindingUsage</code> isn’t re-exported from <code>crate::expr</code>; let’s fix that. We’ll also re-export <code>Block</code> for consistency:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p><code>BindingUsage</code> isn’t re-exported from <code>crate::expr</code>; let’s fix that. We’ll also re-export <code>Block</code> for consistency:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>binding_usage</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>block</span><span class=p>;</span><span class=w>
@@ -145,15 +90,13 @@
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>val</span>::<span class=n>Val</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>The field <code>name</code> on <code>BindingUsage</code> is <code>pub(super)</code>, when it should be <code>pub(crate)</code> so we can use it for our tests:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
+</span></code></pre></div><p>The field <code>name</code> on <code>BindingUsage</code> is <code>pub(super)</code>, when it should be <code>pub(crate)</code> so we can use it for our tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now need to create <code>crate::func_def::FuncDef</code>. Let’s start by declaring and creating the module:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
+</span></code></pre></div><p>We now need to create <code>crate::func_def::FuncDef</code>. Let’s start by declaring and creating the module:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>binding_def</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>env</span><span class=p>;</span><span class=w>
@@ -162,8 +105,7 @@
 </span><span class=c1></span><span class=k>mod</span> <span class=nn>stmt</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>utils</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>val</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Open <code>src/func_def.rs</code> and declare <code>FuncDef</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Open <code>src/func_def.rs</code> and declare <code>FuncDef</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -171,8 +113,7 @@
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>body</span>: <span class=nc>Stmt</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s try compiling Eldiro:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo c
+</span></code></pre></div><p>Let’s try compiling Eldiro:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo c
 error[E0072]: recursive type `func_def::FuncDef` has infinite size
  --&gt; crates/eldiro/src/func_def.rs:4:1
   |
@@ -220,17 +161,7 @@ note: cycle used when computing drop-check constraints for `Parse`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 3 previous errors
-</code></pre><p>Whoa! We have a bunch of errors because we’ve accidentally created a <em>recursive type</em> &ndash; a type that contains itself. Rust doesn’t like this because, when it’s calculating the size of <code>Stmt</code>, it falls into the following loop:</p>
-<ol>
-<li>To calculate <code>Stmt</code>’s size, I need to find the size of <code>Stmt</code>’s largest variant.</li>
-<li>To calculate <code>Stmt::BindingDef</code>’s size, I need to find the size of all its fields.</li>
-<li><em>Calculates the size of all of <code>BindingDef</code>’s fields.</em></li>
-<li>To calculate <code>Stmt::FuncDef</code>’s size, I need to find the size of all its fields.</li>
-<li>To calculate the size of the <code>body</code> field of <code>FuncDef</code>, I need to find the size of <code>Stmt</code>.</li>
-<li>Go to 1.</li>
-</ol>
-<p>In other words &ndash; we have a recursive type because <code>Stmt</code> could contain a <code>FuncDef</code> depending on which variant it is, and <code>FuncDef</code> in turn contains a <code>Stmt</code> through the <code>body</code> field. The Rust compiler very kindly suggests how to remove the recursion; namely, add indirection somewhere. I’ll opt for <code>Box</code>ing the <code>body</code> of <code>FuncDef</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
+</code></pre><p>Whoa! We have a bunch of errors because we’ve accidentally created a <em>recursive type</em> &ndash; a type that contains itself. Rust doesn’t like this because, when it’s calculating the size of <code>Stmt</code>, it falls into the following loop:</p><ol><li>To calculate <code>Stmt</code>’s size, I need to find the size of <code>Stmt</code>’s largest variant.</li><li>To calculate <code>Stmt::BindingDef</code>’s size, I need to find the size of all its fields.</li><li><em>Calculates the size of all of <code>BindingDef</code>’s fields.</em></li><li>To calculate <code>Stmt::FuncDef</code>’s size, I need to find the size of all its fields.</li><li>To calculate the size of the <code>body</code> field of <code>FuncDef</code>, I need to find the size of <code>Stmt</code>.</li><li>Go to 1.</li></ol><p>In other words &ndash; we have a recursive type because <code>Stmt</code> could contain a <code>FuncDef</code> depending on which variant it is, and <code>FuncDef</code> in turn contains a <code>Stmt</code> through the <code>body</code> field. The Rust compiler very kindly suggests how to remove the recursion; namely, add indirection somewhere. I’ll opt for <code>Box</code>ing the <code>body</code> of <code>FuncDef</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
 </span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -238,21 +169,7 @@ error: aborting due to 3 previous errors
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>body</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Stmt</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>A <code>Box&lt;Stmt></code> is a pointer to some memory on the heap that contains a <code>Stmt</code>. Rust’s process for calculating the size of <code>Stmt</code> now goes like this:</p>
-<ol>
-<li>To calculate <code>Stmt</code>’s size, I need to find the size of <code>Stmt</code>’s largest variant.</li>
-<li>To calculate <code>Stmt::BindingDef</code>’s size, I need to find the size of all its fields.</li>
-<li><em>Calculates the size of all of <code>BindingDef</code>’s fields.</em></li>
-<li>To calculate <code>Stmt::FuncDef</code>’s size, I need to find the size of all its fields.</li>
-<li>To calculate the size of the <code>name</code> field of <code>FuncDef</code>, I need to find the size of <code>String</code> (it’s 24 bytes).</li>
-<li>To calculate the size of the <code>params</code> field of <code>FuncDef</code>, I need to find the size of <code>Vec</code> (it’s 24 bytes).</li>
-<li>To calculate the size of the <code>body</code> field of <code>FuncDef</code>, I need to find the size of <code>Box</code> (depends on your architecture, e.g. on a 64-bit system it’s 8 bytes).</li>
-<li>To calculate <code>Stmt::Expr</code>’s size, I need to find the size of <code>Expr</code>.</li>
-<li>&mldr;</li>
-</ol>
-<p>No more recursion, so Rust doesn’t get stuck when trying to calculate <code>Stmt</code>’s size.</p>
-<p>We now need to update that test we wrote earlier:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</span></code></pre></div><p>A <code>Box&lt;Stmt></code> is a pointer to some memory on the heap that contains a <code>Stmt</code>. Rust’s process for calculating the size of <code>Stmt</code> now goes like this:</p><ol><li>To calculate <code>Stmt</code>’s size, I need to find the size of <code>Stmt</code>’s largest variant.</li><li>To calculate <code>Stmt::BindingDef</code>’s size, I need to find the size of all its fields.</li><li><em>Calculates the size of all of <code>BindingDef</code>’s fields.</em></li><li>To calculate <code>Stmt::FuncDef</code>’s size, I need to find the size of all its fields.</li><li>To calculate the size of the <code>name</code> field of <code>FuncDef</code>, I need to find the size of <code>String</code> (it’s 24 bytes).</li><li>To calculate the size of the <code>params</code> field of <code>FuncDef</code>, I need to find the size of <code>Vec</code> (it’s 24 bytes).</li><li>To calculate the size of the <code>body</code> field of <code>FuncDef</code>, I need to find the size of <code>Box</code> (depends on your architecture, e.g. on a 64-bit system it’s 8 bytes).</li><li>To calculate <code>Stmt::Expr</code>’s size, I need to find the size of <code>Expr</code>.</li><li>&mldr;</li></ol><p>No more recursion, so Rust doesn’t get stuck when trying to calculate <code>Stmt</code>’s size.</p><p>We now need to update that test we wrote earlier:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -277,8 +194,7 @@ error: aborting due to 3 previous errors
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write another test for parsing a function definition, but this time in <code>func_def.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s write another test for parsing a function definition, but this time in <code>func_def.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=p>{</span><span class=n>Block</span><span class=p>,</span><span class=w> </span><span class=n>Expr</span><span class=p>};</span><span class=w>
@@ -298,15 +214,13 @@ error: aborting due to 3 previous errors
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to make the <code>stmts</code> field of <code>Block</code> <code>pub(crate)</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
+</span></code></pre></div><p>We need to make the <code>stmts</code> field of <code>Block</code> <code>pub(crate)</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Block</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>stmts</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Stmt</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s implement <code>FuncDef::new</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
+</span></code></pre></div><p>Let’s implement <code>FuncDef::new</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -331,8 +245,7 @@ error: aborting due to 3 previous errors
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We should run the tests to see how we went:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>We should run the tests to see how we went:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ..........................................F.....
 failures:
@@ -348,8 +261,7 @@ failures:
     stmt::tests::parse_func_def
 
 test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Looks like the <code>parse_func_def_with_no_params_and_empty_body</code> test passed, but the test we wrote in <code>stmt.rs</code> is failing. To make the test pass, we need to handle parameters:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Looks like the <code>parse_func_def_with_no_params_and_empty_body</code> test passed, but the test we wrote in <code>stmt.rs</code> is failing. To make the test pass, we need to handle parameters:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;fn&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
@@ -383,8 +295,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We also use this approach of ‘keep extracting something (in this case identifiers) and stuff them into a <code>Vec</code> until you can’t continue’ in <code>Block::new</code>. Let’s see if it works:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>We also use this approach of ‘keep extracting something (in this case identifiers) and stuff them into a <code>Vec</code> until you can’t continue’ in <code>Block::new</code>. Let’s see if it works:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ..........................................F.....
 failures:
@@ -400,9 +311,7 @@ failures:
     stmt::tests::parse_func_def
 
 test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Hmm, I thought we’d fixed it. <em>thinking emoji …</em></p>
-<p>Ah, I figured it out! The test that’s failing is using <code>Stmt::new</code>, which we haven’t updated to try parsing a function definition. Here’s the current implementation:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
+</code></pre><p>Hmm, I thought we’d fixed it. <em>thinking emoji …</em></p><p>Ah, I figured it out! The test that’s failing is using <code>Stmt::new</code>, which we haven’t updated to try parsing a function definition. Here’s the current implementation:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// stmt.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -413,8 +322,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to add just one line to make the test pass:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We need to add just one line to make the test pass:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>BindingDef</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w>
 </span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>binding_def</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>BindingDef</span><span class=p>(</span><span class=n>binding_def</span><span class=p>)))</span><span class=w>
@@ -424,8 +332,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Remember that technique we used in both <code>FuncDef::new</code> and <code>Block::new</code> to parse multiple things? Let’s extract that logic into a helper function in <code>crate::utils</code> to remove the duplication and make the code easier to read:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
+</span></code></pre></div><p>Remember that technique we used in both <code>FuncDef::new</code> and <code>Block::new</code> to parse multiple things? Let’s extract that logic into a helper function in <code>crate::utils</code> to remove the duplication and make the code easier to read:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
 </span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=k>mut</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -441,9 +348,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>items</span><span class=p>))</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The function is generic over the type of the thing being parsed. It <em>isn’t</em> generic over the type of error the parser returns, though, because our project only has one type of parser error: <code>String</code>. Take a look at <a href=https://matklad.github.io/2020/08/15/concrete-abstraction.html>this article</a> to see more of the rationale behind this decision.</p>
-<p>We can make use of our shiny new <code>sequence</code> function in <code>Block::new</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
+</span></code></pre></div><p>The function is generic over the type of the thing being parsed. It <em>isn’t</em> generic over the type of error the parser returns, though, because our project only has one type of parser error: <code>String</code>. Take a look at <a href=https://matklad.github.io/2020/08/15/concrete-abstraction.html>this article</a> to see more of the rationale behind this decision.</p><p>We can make use of our shiny new <code>sequence</code> function in <code>Block::new</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -460,8 +365,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>and <code>FuncDef::new</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
+</span></code></pre></div><p>and <code>FuncDef::new</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -488,8 +392,7 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Wait! That doesn’t compile, because <code>params</code> is now of type <code>Vec&lt;&str></code> instead of <code>Vec&lt;String></code>. <code>params</code> is a <code>Vec&lt;&str></code> because the type that <code>utils::extract_ident</code> returns (ignoring the usual leftover input <code>&str</code>) is a <code>&str</code>, which is picked up and propagated by the <code>&lt;T></code> in <code>utils::sequence</code>. We can fix this by passing <code>utils::sequence</code> a wrapper closure around <code>utils::extract_ident</code> that turns the identifier it extracts into a <code>String</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Wait! That doesn’t compile, because <code>params</code> is now of type <code>Vec&lt;&str></code> instead of <code>Vec&lt;String></code>. <code>params</code> is a <code>Vec&lt;&str></code> because the type that <code>utils::extract_ident</code> returns (ignoring the usual leftover input <code>&str</code>) is a <code>&str</code>, which is picked up and propagated by the <code>&lt;T></code> in <code>utils::sequence</code>. We can fix this by passing <code>utils::sequence</code> a wrapper closure around <code>utils::extract_ident</code> that turns the identifier it extracts into a <code>String</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;fn&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
@@ -517,13 +420,11 @@ test result: FAILED. 47 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And now this works perfectly:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>And now this works perfectly:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 48 tests
 ................................................
 test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write another test:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Let’s write another test:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -542,13 +443,11 @@ test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It passes:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>It passes:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 49 tests
 .................................................
 test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write a test with multiple parameters and a non-empty body:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</code></pre><p>Let’s write a test with multiple parameters and a non-empty body:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
 </span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=p>{</span><span class=n>BindingUsage</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=p>,</span><span class=w> </span><span class=n>Expr</span><span class=p>,</span><span class=w> </span><span class=n>Op</span><span class=p>};</span><span class=w>
@@ -578,27 +477,21 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Aaaand it doesn’t compile. It seems that the fields <code>lhs</code> and <code>rhs</code> of <code>Expr::Operation</code> can only be <code>crate::expr::Number</code>s. Although this <em>does</em> adhere to our initial design decision to disallow nested expressions, it prevents us from doing things as basic as defining an <code>add</code> function! We need to fix this.</p>
-<h1 id=allowing-operations-on-expressions>Allowing operations on expressions</h1>
-<p>It might be helpful to run <code>git stash</code> &ndash; if you’re using Git &ndash; to temporarily hide the modifications we’ve made to existing files in our quest to add support for function definitions. Note that this will leave <code>func_def.rs</code> intact.</p>
-<p>Let’s remind ourselves of <code>Expr</code>’s definition:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>Aaaand it doesn’t compile. It seems that the fields <code>lhs</code> and <code>rhs</code> of <code>Expr::Operation</code> can only be <code>crate::expr::Number</code>s. Although this <em>does</em> adhere to our initial design decision to disallow nested expressions, it prevents us from doing things as basic as defining an <code>add</code> function! We need to fix this.</p><h1 id=allowing-operations-on-expressions>Allowing operations on expressions</h1><p>It might be helpful to run <code>git stash</code> &ndash; if you’re using Git &ndash; to temporarily hide the modifications we’ve made to existing files in our quest to add support for function definitions. Note that this will leave <code>func_def.rs</code> intact.</p><p>Let’s remind ourselves of <code>Expr</code>’s definition:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span>: <span class=nc>Number</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span>: <span class=nc>Number</span><span class=p>,</span><span class=w> </span><span class=n>op</span>: <span class=nc>Op</span><span class=w> </span><span class=p>},</span><span class=w>
 </span><span class=w>    </span><span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Block</span><span class=p>(</span><span class=n>Block</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Your first instinct might be to change that to</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>Your first instinct might be to change that to</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span>: <span class=nc>Self</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span>: <span class=nc>Self</span><span class=p>,</span><span class=w> </span><span class=n>op</span>: <span class=nc>Op</span><span class=w> </span><span class=p>},</span><span class=w>
 </span><span class=w>    </span><span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Block</span><span class=p>(</span><span class=n>Block</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Remember, though, that that would lead to the recursive type error we got earlier. We need to add <code>Box</code>es:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>Remember, though, that that would lead to the recursive type error we got earlier. We need to add <code>Box</code>es:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -609,8 +502,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Block</span><span class=p>(</span><span class=n>Block</span><span class=p>),</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s start by fixing all the tests:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_def.rs
+</span></code></pre></div><p>Let’s start by fixing all the tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -808,9 +700,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that we’ve updated all those tests, it’s time to tackle the four outstanding compilation errors. Two of these are from parsing an <code>Expr::Operation</code>, and the other two are from evaluating it.</p>
-<p>Let’s fix the parsing first. Here’s how an <code>Expr::Operation</code> is currently parsed:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>Now that we’ve updated all those tests, it’s time to tackle the four outstanding compilation errors. Two of these are from parsing an <code>Expr::Operation</code>, and the other two are from evaluating it.</p><p>Let’s fix the parsing first. Here’s how an <code>Expr::Operation</code> is currently parsed:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -829,8 +719,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>As you can see, <code>lhs</code> and <code>rhs</code> are of type <code>Number</code>, not of type <code>Box&lt;Expr></code>. We can add the <code>Box</code> part:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>As you can see, <code>lhs</code> and <code>rhs</code> are of type <code>Number</code>, not of type <code>Box&lt;Expr></code>. We can add the <code>Box</code> part:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>new_operation</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -854,8 +743,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s try making <code>lhs</code> and <code>rhs</code> <code>Expr</code>s by calling <code>Expr::new</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s try making <code>lhs</code> and <code>rhs</code> <code>Expr</code>s by calling <code>Expr::new</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>new_operation</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -879,8 +767,7 @@ test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This looks reasonable enough. Let’s run the tests:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>This looks reasonable enough. Let’s run the tests:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 error[E0308]: mismatched types
   --&gt; crates/eldiro/src/expr.rs:89:21
    |
@@ -904,8 +791,7 @@ error[E0308]: mismatched types
               found struct `expr::Number`
 
 error: aborting due to 2 previous errors
-</code></pre><p>Oh, yeah, we still have that compilation error. Let’s add a <code>todo!()</code> and comment out the rest so we can get on with running our tests:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Oh, yeah, we still have that compilation error. Let’s add a <code>todo!()</code> and comment out the rest so we can get on with running our tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -936,8 +822,7 @@ running 46 tests
 .........F.F.FF.F.
 thread 'binding_def::tests::parse_binding_def' has overflowed its stack
 fatal runtime error: stack overflow
-</code></pre><p>Oh, no. Oh, no no no. What’s happened here is that <code>Expr::new_operation</code> has called <code>Expr::new</code>, which calls <code>Expr::new_operation</code>, and so forth. The solution to this is to create an intermediary function that tries parsing all the possibilities <em>apart from</em> <code>Expr::Operation</code>. We use this function to parse <code>lhs</code> and <code>rhs</code>, and use it and <code>Expr::new_operation</code> in <code>Expr::new</code>. It’s difficult to explain with words; take look at the code:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Oh, no. Oh, no no no. What’s happened here is that <code>Expr::new_operation</code> has called <code>Expr::new</code>, which calls <code>Expr::new_operation</code>, and so forth. The solution to this is to create an intermediary function that tries parsing all the possibilities <em>apart from</em> <code>Expr::Operation</code>. We use this function to parse <code>lhs</code> and <code>rhs</code>, and use it and <code>Expr::new_operation</code> in <code>Expr::new</code>. It’s difficult to explain with words; take look at the code:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>Self</span>::<span class=n>new_operation</span><span class=p>(</span><span class=n>s</span><span class=p>).</span><span class=n>or_else</span><span class=p>(</span><span class=o>|</span><span class=n>_</span><span class=o>|</span><span class=w> </span><span class=n>Self</span>::<span class=n>new_non_operation</span><span class=p>(</span><span class=n>s</span><span class=p>))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
@@ -1004,9 +889,7 @@ failures:
     expr::tests::eval_sub
 
 test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Ah, those failures are from the <code>todo!()</code> in <code>Expr::eval</code>. Regardless, all the parsers are passing, which means that we’ve managed to fix both of our issues at once: we no longer have a stack overflow, and we have also prevented nested operations (since <code>lhs</code> and <code>rhs</code> call <code>Expr::new_non_operation</code>, there’s no chance that they could be <code>Expr::Operation</code>s themselves).</p>
-<p>Here’s the current state of <code>Expr::eval</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Ah, those failures are from the <code>todo!()</code> in <code>Expr::eval</code>. Regardless, all the parsers are passing, which means that we’ve managed to fix both of our issues at once: we no longer have a stack overflow, and we have also prevented nested operations (since <code>lhs</code> and <code>rhs</code> call <code>Expr::new_non_operation</code>, there’s no chance that they could be <code>Expr::Operation</code>s themselves).</p><p>Here’s the current state of <code>Expr::eval</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1032,8 +915,7 @@ test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To evaluate an <code>Expr::Operation</code>, we must first evaluate the <code>lhs</code> and the <code>rhs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>To evaluate an <code>Expr::Operation</code>, we must first evaluate the <code>lhs</code> and the <code>rhs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1057,8 +939,7 @@ test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’ve got errors now because you can’t add, subtract, multiply or divide <code>Val</code>s. What we want is for <code>lhs</code> and <code>rhs</code> to be integers. Before, when we knew that <code>lhs</code> and <code>rhs</code> were <code>Numbers</code>, we could simply use pattern matching to extract the contained integer. Now, though, they could be any type that <code>Val</code> can contain. Although at the moment this means that <code>lhs</code> and <code>rhs</code> could both either be <code>Number</code>s or <code>Unit</code>s, we’ll add strings and other data types in the future. To solve this issue, we need to check that <code>lhs</code> and <code>rhs</code> are indeed <code>Val::Number</code>s, and if they aren’t return an error.</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We’ve got errors now because you can’t add, subtract, multiply or divide <code>Val</code>s. What we want is for <code>lhs</code> and <code>rhs</code> to be integers. Before, when we knew that <code>lhs</code> and <code>rhs</code> were <code>Numbers</code>, we could simply use pattern matching to extract the contained integer. Now, though, they could be any type that <code>Val</code> can contain. Although at the moment this means that <code>lhs</code> and <code>rhs</code> could both either be <code>Number</code>s or <code>Unit</code>s, we’ll add strings and other data types in the future. To solve this issue, we need to check that <code>lhs</code> and <code>rhs</code> are indeed <code>Val::Number</code>s, and if they aren’t return an error.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1087,8 +968,7 @@ test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write a test to verify that the error message kicks in at the right time:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Let’s write a test to verify that the error message kicks in at the right time:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -1111,43 +991,32 @@ test result: FAILED. 41 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out
 running 47 tests
 ...............................................
 test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Run <code>git stash pop</code> to get back the changes we made for function definitions. Let’s run the tests again to see if the new feature of <code>Expr::Operation</code> is being used successfully:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Run <code>git stash pop</code> to get back the changes we made for function definitions. Let’s run the tests again to see if the new feature of <code>Expr::Operation</code> is being used successfully:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 51 tests
 ...................................................
 test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Beautiful! With that diversion complete, we can get back to testing the parsing of function definitions.</p>
-<h1 id=back-to-parsing>Back to parsing</h1>
-<p>So, what tests do we still need for the parsing? Well, we have one with no parameters and an empty body. We also have one with one parameter and an empty body, as well as one with multiple parameters and a non-empty body. Although we haven’t tested every possible combination, we’ve tested enough scenarios for me to be confident that the parser is working correctly.</p>
-<h1 id=evaluation>Evaluation</h1>
-<p>Here’s the definition of <code>Env</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
+</code></pre><p>Beautiful! With that diversion complete, we can get back to testing the parsing of function definitions.</p><h1 id=back-to-parsing>Back to parsing</h1><p>So, what tests do we still need for the parsing? Well, we have one with no parameters and an empty body. We also have one with one parameter and an empty body, as well as one with multiple parameters and a non-empty body. Although we haven’t tested every possible combination, we’ve tested enough scenarios for me to be confident that the parser is working correctly.</p><h1 id=evaluation>Evaluation</h1><p>Here’s the definition of <code>Env</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>bindings</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>Val</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>parent</span>: <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;parent</span><span class=w> </span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>One way to store function definitions in <code>Env</code> is to add another field, <code>funcs</code>, and have its type be</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=n>HashMap</span><span class=o>&lt;</span><span class=w>
+</span></code></pre></div><p>One way to store function definitions in <code>Env</code> is to add another field, <code>funcs</code>, and have its type be</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=n>HashMap</span><span class=o>&lt;</span><span class=w>
 </span><span class=w>    </span><span class=nb>String</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=cm>/* everything inside of FuncDef apart from name */</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=o>&gt;</span><span class=w>
-</span></code></pre></div><p>Alternatively, you could have only one field for both bindings and functions. The type of this field is <code>HashMap&lt;String, V></code>, where V is an enum that holds either a binding’s value, or information about a function. This way, you can’t ever have both a function and a binding with the same name &ndash; whichever one is declared last takes priority. This method also prevents duplication of the ‘recursively search parents’ logic we wrote originally for bindings.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p>
-<p>A nice place to start is removing the <code>bindings</code> field and replacing it with a field called … well, it can contain bindings and functions … what do they both have in common? … names?</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
+</span></code></pre></div><p>Alternatively, you could have only one field for both bindings and functions. The type of this field is <code>HashMap&lt;String, V></code>, where V is an enum that holds either a binding’s value, or information about a function. This way, you can’t ever have both a function and a binding with the same name &ndash; whichever one is declared last takes priority. This method also prevents duplication of the ‘recursively search parents’ logic we wrote originally for bindings.<sup id=fnref:2><a href=#fn:2 class=footnote-ref role=doc-noteref>2</a></sup></p><p>A nice place to start is removing the <code>bindings</code> field and replacing it with a field called … well, it can contain bindings and functions … what do they both have in common? … names?</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>named</span>: <span class=nc>HashMap</span><span class=o>&lt;</span><span class=nb>String</span><span class=p>,</span><span class=w> </span><span class=n>NamedInfo</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>parent</span>: <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;parent</span><span class=w> </span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s declare <code>NamedInfo</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// still in env.rs
+</span></code></pre></div><p>Let’s declare <code>NamedInfo</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// still in env.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>enum</span> <span class=nc>NamedInfo</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Binding</span><span class=p>(</span><span class=n>Val</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Func</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w> </span><span class=n>body</span>: <span class=nc>Stmt</span><span class=w> </span><span class=p>},</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to update all of <code>Env</code>’s methods &ndash; at the same time, we can also add methods for functions:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=n>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We need to update all of <code>Env</code>’s methods &ndash; at the same time, we can also add methods for functions:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=n>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>create_child</span><span class=p>(</span><span class=o>&amp;</span><span class=na>&#39;parent</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>            </span><span class=n>named</span>: <span class=nc>HashMap</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
@@ -1188,8 +1057,7 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>            </span><span class=p>.</span><span class=n>or_else</span><span class=p>(</span><span class=o>||</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>parent</span><span class=p>.</span><span class=n>and_then</span><span class=p>(</span><span class=o>|</span><span class=n>parent</span><span class=o>|</span><span class=w> </span><span class=n>parent</span><span class=p>.</span><span class=n>get_named_info</span><span class=p>(</span><span class=n>name</span><span class=p>)))</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>That code is a touch repetitive. Let‘s add some methods to <code>NamedInfo</code> to make converting it into its variants easier:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>NamedInfo</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>That code is a touch repetitive. Let‘s add some methods to <code>NamedInfo</code> to make converting it into its variants easier:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>NamedInfo</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>into_binding</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Val</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Self</span>::<span class=n>Binding</span><span class=p>(</span><span class=n>val</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>val</span><span class=p>)</span><span class=w>
@@ -1206,8 +1074,7 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s make use of that in <code>Env::get_binding</code> and <code>Env::get_func</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=n>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s make use of that in <code>Env::get_binding</code> and <code>Env::get_func</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=n>Env</span><span class=o>&lt;</span><span class=na>&#39;parent</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>get_binding</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>name</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1224,15 +1091,12 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The first of the two compilation errors we have left is from us not being allowed to call <code>.cloned()</code> in <code>Env::get_named_info</code>, since <code>NamedInfo</code> doesn’t implement <code>Clone</code>. Let’s fix that:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
+</span></code></pre></div><p>The first of the two compilation errors we have left is from us not being allowed to call <code>.cloned()</code> in <code>Env::get_named_info</code>, since <code>NamedInfo</code> doesn’t implement <code>Clone</code>. Let’s fix that:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>enum</span> <span class=nc>NamedInfo</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>Binding</span><span class=p>(</span><span class=n>Val</span><span class=p>),</span><span class=w>
 </span><span class=w>    </span><span class=n>Func</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w> </span><span class=n>body</span>: <span class=nc>Stmt</span><span class=w> </span><span class=p>},</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This doesn’t compile, since <code>Stmt</code> doesn’t implement <code>Clone</code>. I’ll leave you to go through all the ‘blah doesn’t implement <code>Clone</code>’ errors, since adding <code>#[derive(Clone)]</code> to almost all the types we’ve written so far is too laborious to write out here. As I did in the last article, <a href=https://github.com/arzg/eldiro/commit/a2a406db5bfe0e369c4da7dc62b1ed463731fb36>here’s a link to the diff of the commit that adds this</a> on GitHub in case you get lost.</p>
-<p>We only have one error left; ‘no method named <code>get_binding_value</code>’. Let’s fix it:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
+</span></code></pre></div><p>This doesn’t compile, since <code>Stmt</code> doesn’t implement <code>Clone</code>. I’ll leave you to go through all the ‘blah doesn’t implement <code>Clone</code>’ errors, since adding <code>#[derive(Clone)]</code> to almost all the types we’ve written so far is too laborious to write out here. As I did in the last article, <a href=https://github.com/arzg/eldiro/commit/a2a406db5bfe0e369c4da7dc62b1ed463731fb36>here’s a link to the diff of the commit that adds this</a> on GitHub in case you get lost.</p><p>We only have one error left; ‘no method named <code>get_binding_value</code>’. Let’s fix it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -1241,8 +1105,7 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>get_binding</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>name</span><span class=p>)</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that all those shenanigans with <code>Env</code> are done, we can finally implement evaluation of function definitions. Let‘s start with a test in <code>stmt.rs</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
+</span></code></pre></div><p>Now that all those shenanigans with <code>Env</code> are done, we can finally implement evaluation of function definitions. Let‘s start with a test in <code>stmt.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
@@ -1261,8 +1124,7 @@ test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To stay consistent with <code>crate::stmt::tests::eval_binding_def</code>, the test doesn’t examine the effect it’s had on the <code>Env</code> &ndash; instead, it just checks that evaluating a function definition gives you a <code>Unit</code>.</p>
-<pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</span></code></pre></div><p>To stay consistent with <code>crate::stmt::tests::eval_binding_def</code>, the test doesn’t examine the effect it’s had on the <code>Env</code> &ndash; instead, it just checks that evaluating a function definition gives you a <code>Unit</code>.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
 running 52 tests
 .............................................F......
 failures:
@@ -1276,8 +1138,7 @@ failures:
     stmt::tests::eval_func_def
 
 test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s remove the <code>todo!()</code> from <code>Stmt::eval</code>, and fix this:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>Let’s remove the <code>todo!()</code> from <code>Stmt::eval</code>, and fix this:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1294,8 +1155,7 @@ test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s create an empty <code>FuncDef::eval</code> so that we can run our tests:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
+</span></code></pre></div><p>Let’s create an empty <code>FuncDef::eval</code> so that we can run our tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>env</span>::<span class=n>Env</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
@@ -1314,8 +1174,7 @@ test result: FAILED. 51 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
 running 52 tests
 ....................................................
 test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We don’t need to write a test for evaluating function definitions, since the code to do so is trivial:<sup id=fnref:3><a href=#fn:3 class=footnote-ref role=doc-noteref>3</a></sup></p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>We don’t need to write a test for evaluating function definitions, since the code to do so is trivial:<sup id=fnref:3><a href=#fn:3 class=footnote-ref role=doc-noteref>3</a></sup></p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -1323,32 +1182,4 @@ test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=nb>Ok</span><span class=p>(())</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>See you all next time, when we’ll add function calls to Eldiro.</p>
-<section class=footnotes role=doc-endnotes>
-<hr>
-<ol>
-<li id=fn:1 role=doc-endnote>
-<p>The syntax highlighting has gone away because this isn’t Rust anymore, and my website doesn’t have Eldiro syntax highlighting.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-<li id=fn:2 role=doc-endnote>
-<p>I spent almost an hour trying to refactor this logic out so that it can be reused in an attempt to use the first approach without copy-pasting. My first try at this used a macro, but the macro took up more code than copy-pasting the code. The same thing happened when I tried using a generic function instead.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-<li id=fn:3 role=doc-endnote>
-<p>Famous last words.&#160;<a href=#fnref:3 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-</ol>
-</section>
-</main>
-<nav class=page-navigation>
-<div class=prev>
-<p class=hint>Previously</p>
-<a href=https://arzg.github.io/lang/7/>Part Seven: A REPL</a>
-</div>
-<div class=next>
-<p class=hint>Next up</p>
-<a href=https://arzg.github.io/lang/9/>Part Nine: Function Calls</a>
-</div>
-<div style=clear:both></div>
-</nav>
-</body>
-</html>
+</span></code></pre></div><p>See you all next time, when we’ll add function calls to Eldiro.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>The syntax highlighting has gone away because this isn’t Rust anymore, and my website doesn’t have Eldiro syntax highlighting.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:2 role=doc-endnote><p>I spent almost an hour trying to refactor this logic out so that it can be reused in an attempt to use the first approach without copy-pasting. My first try at this used a macro, but the macro took up more code than copy-pasting the code. The same thing happened when I tried using a generic function instead.&#160;<a href=#fnref:2 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li><li id=fn:3 role=doc-endnote><p>Famous last words.&#160;<a href=#fnref:3 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/7/>Part Seven: A REPL</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/9/>Part Nine: Function Calls</a></div><div style=clear:both></div></nav></body></html>

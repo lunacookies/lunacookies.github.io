@@ -1,43 +1,6 @@
-<!doctype html><html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>Part Fifteen: Markers · arzg’s website</title>
-<link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo=">
-<script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Fifteen: Markers · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4531c1d2b2b0539327007c53c7f23622523315f193aacfbe4d0c4701ee01cd4a.css integrity="sha256-RTHB0rKwU5MnAHxTx/I2IlIzFfGTqs++TQxHAe4BzUo="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script>
-<link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png>
-<link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png>
-<link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png>
-<link rel=manifest href=/site.webmanifest>
-</head>
-<body>
-<nav class=site-navigation>
-<ul>
-<li>
-<a href=/>Home</a>
-</li>
-<li>
-<a href=/blog/>Blog</a>
-</li>
-<li class=current>
-<a href=/lang/>Make A Language</a>
-</li>
-</ul>
-</nav>
-<header class=header-area>
-<h1 class=title>Part Fifteen: Markers</h1>
-<section class=page-info>
-<ul>
-<li>16 December 2020</li>
-<li>2168 words</li>
-<li>eleven minute read</li>
-</ul>
-</section>
-</header>
-<main><p>A ‘marker’ is an abstraction over Rowan that makes working with it nicer, and also allows for some fancier parsing techniques. You can think of them as a fancy version of the checkpoints we’ve been using up to this point. Here’s a rough sketch of the API we’ll create:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Parser</span><span class=w> </span><span class=p>{</span><span class=w>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Fifteen: Markers</h1><section class=page-info><ul><li>16 December 2020</li><li>2168 words</li><li>eleven minute read</li></ul></section></header><main><p>A ‘marker’ is an abstraction over Rowan that makes working with it nicer, and also allows for some fancier parsing techniques. You can think of them as a fancy version of the checkpoints we’ve been using up to this point. Here’s a rough sketch of the API we’ll create:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Parser</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>start</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
 </span><span class=w>
@@ -52,13 +15,7 @@
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>fn</span> <span class=nf>precede</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Additionally, we will ensure that <code>Marker</code> panics if it has been dropped without being completed.</p>
-<p><code>Parser::start</code> creates a new marker at the parser’s current position. After creating a marker, we can <code>bump</code> tokens and start new nodes as normal; once we’re done we call <code>complete</code> on the marker, which wraps, in a <code>SyntaxKind</code> of our choice, all the tokens and nodes added since the marker’s creation.</p>
-<p>Markers’ property of panicking if they haven’t been completed is one of the benefits they have over plain <code>Parser::start_node</code> and <code>finish_node</code> calls. If you forget to call <code>finish_node</code> you get a panic with a cryptic message from Rowan. If you forget to complete a marker, though, you instead get a clearer panic message with a backtrace that tells you where the marker was dropped.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p>
-<p>If we later decide that we really should have wrapped that node in another node, we can call <code>precede</code> on the <code>CompletedMarker</code> that <code>Marker::complete</code> returned to us. This <code>precede</code> method gives us a marker, meaning that we can once again add to the syntax tree and later call <code>Marker::complete</code>.</p>
-<p>Note that the existence of <code>Marker</code> means that we won’t need <code>Parser::start_node</code> or <code>finish_node</code>; we can just create markers and complete them later. Similarly, <code>CompletedMarker</code> supersedes <code>Parser::checkpoint</code> and <code>Parser::start_node_at</code>.</p>
-<p>Let’s begin by writing an implementation of <code>Parser::start</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p>Additionally, we will ensure that <code>Marker</code> panics if it has been dropped without being completed.</p><p><code>Parser::start</code> creates a new marker at the parser’s current position. After creating a marker, we can <code>bump</code> tokens and start new nodes as normal; once we’re done we call <code>complete</code> on the marker, which wraps, in a <code>SyntaxKind</code> of our choice, all the tokens and nodes added since the marker’s creation.</p><p>Markers’ property of panicking if they haven’t been completed is one of the benefits they have over plain <code>Parser::start_node</code> and <code>finish_node</code> calls. If you forget to call <code>finish_node</code> you get a panic with a cryptic message from Rowan. If you forget to complete a marker, though, you instead get a clearer panic message with a backtrace that tells you where the marker was dropped.<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><p>If we later decide that we really should have wrapped that node in another node, we can call <code>precede</code> on the <code>CompletedMarker</code> that <code>Marker::complete</code> returned to us. This <code>precede</code> method gives us a marker, meaning that we can once again add to the syntax tree and later call <code>Marker::complete</code>.</p><p>Note that the existence of <code>Marker</code> means that we won’t need <code>Parser::start_node</code> or <code>finish_node</code>; we can just create markers and complete them later. Similarly, <code>CompletedMarker</code> supersedes <code>Parser::checkpoint</code> and <code>Parser::start_node_at</code>.</p><p>Let’s begin by writing an implementation of <code>Parser::start</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -70,8 +27,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s define <code>Marker</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>Let’s define <code>Marker</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
@@ -96,8 +52,7 @@
 </span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>pos</span><span class=w> </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The next step is to define <code>Marker::complete</code>. Remember that what this does is wrap, in a given <code>SyntaxKind</code>, all the nodes and tokens pushed to the syntax tree since the marker was instantiated. We <em>could</em> use <code>Vec::insert</code> to insert the appropriate <code>Event::StartNode</code> event at the marker’s position; this would throw off the positions of other markers. The solution is to add a ‘placeholder’ variant to <code>Event</code> that we push when the marker is created. When <code>Marker::complete</code> is called we can then replace this placeholder with the real <code>StartNode</code> event, and then finish the node:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</span></code></pre></div><p>The next step is to define <code>Marker::complete</code>. Remember that what this does is wrap, in a given <code>SyntaxKind</code>, all the nodes and tokens pushed to the syntax tree since the marker was instantiated. We <em>could</em> use <code>Vec::insert</code> to insert the appropriate <code>Event::StartNode</code> event at the marker’s position; this would throw off the positions of other markers. The solution is to add a ‘placeholder’ variant to <code>Event</code> that we push when the marker is created. When <code>Marker::complete</code> is called we can then replace this placeholder with the real <code>StartNode</code> event, and then finish the node:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -143,9 +98,7 @@
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
 </span><span class=w>
-</span></code></pre></div><p>Note how we include a sanity check to ensure the event we’re changing is a placeholder, allowing us to catch bugs earlier.</p>
-<p>We have to tell the sink what to do if it encounters a placeholder event; this should never happen (they should all be removed by <code>Marker::complete</code>):</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><p>Note how we include a sanity check to ensure the event we’re changing is a placeholder, allowing us to catch bugs earlier.</p><p>We have to tell the sink what to do if it encounters a placeholder event; this should never happen (they should all be removed by <code>Marker::complete</code>):</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -172,8 +125,7 @@
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s ensure that markers are never accidentally dropped without being completed:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span></code></pre></div><p>Let’s ensure that markers are never accidentally dropped without being completed:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
@@ -207,8 +159,7 @@
 </span><span class=w>        </span><span class=p>}</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It’s annoying to have to maintain that boolean though; let’s use the <a href=https://docs.rs/drop_bomb>drop_bomb</a> crate to handle this for us:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+</span></code></pre></div><p>It’s annoying to have to maintain that boolean though; let’s use the <a href=https://docs.rs/drop_bomb>drop_bomb</a> crate to handle this for us:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
 
 <span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
 <span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
@@ -247,9 +198,7 @@
 </span><span class=w>        </span><span class=n>p</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p><code>DropBomb</code> panics when it’s dropped unless its <code>defuse</code> method has been called.</p>
-<p>Let’s try out our new marker support by replacing the usage of <code>Parser::start_node</code> in <code>Parser::parse</code> with markers:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
+</span></code></pre></div><p><code>DropBomb</code> panics when it’s dropped unless its <code>defuse</code> method has been called.</p><p>Let’s try out our new marker support by replacing the usage of <code>Parser::start_node</code> in <code>Parser::parse</code> with markers:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -268,8 +217,7 @@
 running 35 tests
 ...................................
 test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>It’s now time to remove our usage of checkpoints and transition to using <code>precede</code> on <code>CompletedMarker</code>. Fortunately for us there’s only one place where we use checkpoints: <code>expr_binding_power</code>. The first modification we need to make is to store a <code>CompletedMarker</code> of the the left-hand side of the binary expression, so that we can later call <code>precede</code> on it:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</code></pre><p>It’s now time to remove our usage of checkpoints and transition to using <code>precede</code> on <code>CompletedMarker</code>. Fortunately for us there’s only one place where we use checkpoints: <code>expr_binding_power</code>. The first modification we need to make is to store a <code>CompletedMarker</code> of the the left-hand side of the binary expression, so that we can later call <code>precede</code> on it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -297,8 +245,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>None of the <code>match</code>’s arms have the type <code>CompletedMarker</code>, though. Remember that we can only obtain a <code>CompletedMarker</code> by completing a marker (what a surprise!); thus, it stands to reason that we have to both create a marker and complete it in each arm of the <code>match</code>. Each of the things we parse into <code>lhs</code> need their own <code>SyntaxKind</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
+</span></code></pre></div><p>None of the <code>match</code>’s arms have the type <code>CompletedMarker</code>, though. Remember that we can only obtain a <code>CompletedMarker</code> by completing a marker (what a surprise!); thus, it stands to reason that we have to both create a marker and complete it in each arm of the <code>match</code>. Each of the things we parse into <code>lhs</code> need their own <code>SyntaxKind</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -310,8 +257,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
 </span><span class=w>    </span><span class=n>VariableRef</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now make <code>lhs</code> a <code>CompletedMarker</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>We can now make <code>lhs</code> a <code>CompletedMarker</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -354,8 +300,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s make use of <code>lhs</code> and eradicate the last remaining reference to checkpoints in <code>expr_binding_power</code>. We’ll do this by calling <code>precede</code> on <code>lhs</code> before recursing, giving us a marker we can complete afterwards:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Let’s make use of <code>lhs</code> and eradicate the last remaining reference to checkpoints in <code>expr_binding_power</code>. We’ll do this by calling <code>precede</code> on <code>lhs</code> before recursing, giving us a marker we can complete afterwards:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>    </span><span class=p>};</span><span class=w>
@@ -383,9 +328,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>BinaryExpr</span><span class=p>);</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To make sure that we keep ‘wrapping around’ the expressions we’re parsing, we assign the result of completing the marker to <code>lhs</code>.</p>
-<p>We haven’t implemented <code>CompletedMarker</code>, though, so <code>lhs</code> really has the type of <code>()</code> and <code>precede</code> isn’t defined. First, let’s make <code>Marker::complete</code> return a <code>CompletedMarker</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
+</span></code></pre></div><p>To make sure that we keep ‘wrapping around’ the expressions we’re parsing, we assign the result of completing the marker to <code>lhs</code>.</p><p>We haven’t implemented <code>CompletedMarker</code>, though, so <code>lhs</code> really has the type of <code>()</code> and <code>precede</code> isn’t defined. First, let’s make <code>Marker::complete</code> return a <code>CompletedMarker</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -406,8 +349,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>pos</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The next missing piece is <code>CompletedMarker::precede</code>. Implementing this is tricky; let’s think about how we might approach this problem as we write out a skeleton:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>The next missing piece is <code>CompletedMarker::precede</code>. Implementing this is tricky; let’s think about how we might approach this problem as we write out a skeleton:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>precede</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>new_m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
 </span><span class=w>
@@ -416,16 +358,13 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>new_m</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have the same problem as with <code>Marker::complete</code>; we can’t use <code>Vec::insert</code> or a similar method to shuffle around <code>p.events</code>, as that would invalidate the indices into <code>events</code> that other <code>Marker</code>s and <code>CompletedMarker</code>s use.</p>
-<p>The solution is ingenious: we add another field to <code>Event::StartNode</code> that stores a relative offset from that event <em>forward</em> to its <em>parent.</em> We modify the event at the <code>CompletedMarker</code>’s position so that its <em>forward parent</em> is the marker returned by <code>precede</code>. We can get this <em>forward parent</em> offset with <code>new_m.pos - self.pos</code>.</p>
-<pre tabindex=0><code class=language-- data-lang=->↓ this distance here is the first event’s forward_parent
+</span></code></pre></div><p>We have the same problem as with <code>Marker::complete</code>; we can’t use <code>Vec::insert</code> or a similar method to shuffle around <code>p.events</code>, as that would invalidate the indices into <code>events</code> that other <code>Marker</code>s and <code>CompletedMarker</code>s use.</p><p>The solution is ingenious: we add another field to <code>Event::StartNode</code> that stores a relative offset from that event <em>forward</em> to its <em>parent.</em> We modify the event at the <code>CompletedMarker</code>’s position so that its <em>forward parent</em> is the marker returned by <code>precede</code>. We can get this <em>forward parent</em> offset with <code>new_m.pos - self.pos</code>.</p><pre tabindex=0><code class=language-- data-lang=->↓ this distance here is the first event’s forward_parent
 /-  Event::StartNode { kind: Foo }  &lt;- the event at which
 |   ...                                the marker was created
 |   ... blah blah more events
 |   ...
 \-  Event::StartNode { kind: Placeholder }  &lt;- new_m
-</code></pre><p>Here’s the implementation:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
+</code></pre><p>Here’s the implementation:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -462,9 +401,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>        </span><span class=n>new_m</span><span class=w>
 </span><span class=w>    </span><span class=p>}</span><span class=w>
 </span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Once again we panic (this time with <code>unreachable!()</code>) if the event we’re trying to modify isn’t what we expect.</p>
-<p>There are a number of references to <code>Event::StartNode</code> that need to be updated due to the new field we’ve added:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Once again we panic (this time with <code>unreachable!()</code>) if the event we’re trying to modify isn’t what we expect.</p><p>There are a number of references to <code>Event::StartNode</code> that need to be updated due to the new field we’ve added:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>complete</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -497,9 +434,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The only other references to <code>Event::StartNode</code> that need to be updated are in <code>Sink::finish</code>, which we need to modify anyway to account for <code>forward_parent</code>.</p>
-<p>Remove the first section of <code>Sink::finish</code> that handles checkpoints, since we aren’t using them anymore:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</span></code></pre></div><p>The only other references to <code>Event::StartNode</code> that need to be updated are in <code>Sink::finish</code>, which we need to modify anyway to account for <code>forward_parent</code>.</p><p>Remove the first section of <code>Sink::finish</code> that handles checkpoints, since we aren’t using them anymore:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -524,8 +459,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To support <code>forward_parent</code> we need to ‘pull forward’ the parent, start its node, and then start the node of the event we’re currently looking at. Keep in mind that <code>forward_parent</code> is just an offset, so we need to add it to the index we’re currently up to:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>To support <code>forward_parent</code> we need to ‘pull forward’ the parent, start its node, and then start the node of the event we’re currently looking at. Keep in mind that <code>forward_parent</code> is just an offset, so we need to add it to the index we’re currently up to:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -559,8 +493,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now have an error from trying to use <code>self.events</code> after it was moved by <code>into_iter</code>. Using references won’t work since we need to have ownership to call <code>Sink::token</code>. Let’s try using raw indices into <code>self.events</code>:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>We now have an error from trying to use <code>self.events</code> after it was moved by <code>into_iter</code>. Using references won’t work since we need to have ownership to call <code>Sink::token</code>. Let’s try using raw indices into <code>self.events</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -594,8 +527,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We still have the same error, but now it’s situated at the <code>match</code> instead of the loop. To get ownership we can replace events we have processed with the placeholder:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
+</span></code></pre></div><p>We still have the same error, but now it’s situated at the <code>match</code> instead of the loop. To get ownership we can replace events we have processed with the placeholder:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
 </span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>,</span><span class=w> </span><span class=n>SmolStr</span><span class=p>};</span><span class=w>
@@ -637,10 +569,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Running the tests shows that a lot of the tests have diffs from those extra wrapping nodes we had to add to <code>lhs</code>. This is a great opportunity to use expect-test’s updating feature &ndash; wait, no, it isn’t! Look at the diffs; some of the tests that haven’t panicked are generating the wrong syntax trees. The ones that are panicking are doing so because the number of <code>start_node</code> didn’t match the number of <code>finish_node</code> calls.</p>
-<p>Hmm, why is this happening?</p>
-<p>Ah! When we index into <code>self.events</code> to extract the forward parent, we don’t replace this event with the placeholder. This means that it is iterated over again, causing an overabundance of <code>start_node</code> calls.</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</span></code></pre></div><p>Running the tests shows that a lot of the tests have diffs from those extra wrapping nodes we had to add to <code>lhs</code>. This is a great opportunity to use expect-test’s updating feature &ndash; wait, no, it isn’t! Look at the diffs; some of the tests that haven’t panicked are generating the wrong syntax trees. The ones that are panicking are doing so because the number of <code>start_node</code> didn’t match the number of <code>finish_node</code> calls.</p><p>Hmm, why is this happening?</p><p>Ah! When we index into <code>self.events</code> to extract the forward parent, we don’t replace this event with the placeholder. This means that it is iterated over again, causing an overabundance of <code>start_node</code> calls.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -676,9 +605,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note that we had to update the match arm that handles <code>Event::Placeholder</code> to do nothing, since we now intentionally encounter placeholders (i.e. it isn’t a bug anymore if we see a placeholder).</p>
-<p>None of our tests panic now! For the majority of them the parser outputs the correct syntax tree. However, there are a few, more complex test cases for which the new version is wrong. Take, for example, <code>parse_left_associative_binary_expression</code>. We can run this test individually by running <code>cargo t left_assoc</code> (or any other unique substring of the test name). Let’s manually update the expected syntax tree so that we can tell whether the parser is broken:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
+</span></code></pre></div><p>Note that we had to update the match arm that handles <code>Event::Placeholder</code> to do nothing, since we now intentionally encounter placeholders (i.e. it isn’t a bug anymore if we see a placeholder).</p><p>None of our tests panic now! For the majority of them the parser outputs the correct syntax tree. However, there are a few, more complex test cases for which the new version is wrong. Take, for example, <code>parse_left_associative_binary_expression</code>. We can run this test individually by running <code>cargo t left_assoc</code> (or any other unique substring of the test name). Let’s manually update the expected syntax tree so that we can tell whether the parser is broken:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
 </span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -709,8 +636,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Running the test again shows that the parser is outputting an incorrect syntax tree:</p>
-<pre tabindex=0><code>Root@0..7
+</span></code></pre></div><p>Running the test again shows that the parser is outputting an incorrect syntax tree:</p><pre tabindex=0><code>Root@0..7
   BinaryExpr@0..3
     Literal@0..1
       Number@0..1 &quot;1&quot;
@@ -725,8 +651,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
     Plus@5..6 &quot;+&quot;
     Literal@6..7
       Number@6..7 &quot;4&quot;
-</code></pre><p>The <code>BinaryExpr</code> nodes aren’t being nested correctly. Let’s print <code>self.events</code> at the start of <code>Sink::finish</code> to see the events the parser generated:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
+</code></pre><p>The <code>BinaryExpr</code> nodes aren’t being nested correctly. Let’s print <code>self.events</code> at the start of <code>Sink::finish</code> to see the events the parser generated:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
 </span><span class=c1></span><span class=w>
 </span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
@@ -739,8 +664,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 </span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Here’s what that gives us:</p>
-<pre tabindex=0><code>[crates/eldiro/src/parser/sink.rs:25] &amp;self.events = [
+</span></code></pre></div><p>Here’s what that gives us:</p><pre tabindex=0><code>[crates/eldiro/src/parser/sink.rs:25] &amp;self.events = [
     StartNode {
         kind: Root,
         forward_parent: None,
@@ -816,9 +740,7 @@ test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
     FinishNode,
     FinishNode,
 ]
-</code></pre><p>What a mess! I have a hunch that there’s something wrong with how we handle <code>forward_parent</code> in the sink, since the nesting of <code>BinaryExpr</code>s &ndash; something that happens through <code>CompletedMarker::precede</code> and therefore <code>forward_parent</code> &ndash; is broken. Let’s start at the first occurrence of an event with a forward parent: the second event. This node’s forward parent is <code>4</code>, meaning that it is four events down, which is a <code>StartNode { kind: BinaryExpr }</code>. Curiously, this node itself has a forward parent of <code>6</code>, which <em>also</em> has a forward parent! We need to <code>start_node</code> the last forward parent in the chain <em>first,</em> then the one before that and the one before that until we get to the node that started the chain. Currently in the sink we only handle the original node and its forward parent, but no levels deeper than that. Instead, we should keep checking for forward parents in a loop, accumulating them in a vector. Afterwards we can loop through this vector in reverse (to ensure the last node in the chain of forward parents is started first) and call <code>start_node</code> on each one.</p>
-<p>Enough talking, let’s write the code:</p>
-<div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
+</code></pre><p>What a mess! I have a hunch that there’s something wrong with how we handle <code>forward_parent</code> in the sink, since the nesting of <code>BinaryExpr</code>s &ndash; something that happens through <code>CompletedMarker::precede</code> and therefore <code>forward_parent</code> &ndash; is broken. Let’s start at the first occurrence of an event with a forward parent: the second event. This node’s forward parent is <code>4</code>, meaning that it is four events down, which is a <code>StartNode { kind: BinaryExpr }</code>. Curiously, this node itself has a forward parent of <code>6</code>, which <em>also</em> has a forward parent! We need to <code>start_node</code> the last forward parent in the chain <em>first,</em> then the one before that and the one before that until we get to the node that started the chain. Currently in the sink we only handle the original node and its forward parent, but no levels deeper than that. Instead, we should keep checking for forward parents in a loop, accumulating them in a vector. Afterwards we can loop through this vector in reverse (to ensure the last node in the chain of forward parents is started first) and call <code>start_node</code> on each one.</p><p>Enough talking, let’s write the code:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
 </span><span class=w>    </span><span class=c1>// snip
 </span><span class=c1></span><span class=w>
 </span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
@@ -875,32 +797,8 @@ running 1 test
 test parser::expr::tests::parse_left_associative_binary_expression ... ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out
-</code></pre><p>At least that one test we’ve been looking at is passing. If we try running our entire suite, we’ll find that every single test failure is due to the changes we made to <code>lhs</code>. It is time to update all our failing tests automatically:</p>
-<pre tabindex=0><code class=language-- data-lang=->$ UPDATE_EXPECT=1 cargo t -q
+</code></pre><p>At least that one test we’ve been looking at is passing. If we try running our entire suite, we’ll find that every single test failure is due to the changes we made to <code>lhs</code>. It is time to update all our failing tests automatically:</p><pre tabindex=0><code class=language-- data-lang=->$ UPDATE_EXPECT=1 cargo t -q
 running 35 tests
 ...................................
 test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>All that’s left is to delete <code>Parser::start_node</code>, <code>Parser::start_node_at</code>, <code>Parser::finish_node</code>, <code>Parser::checkpoint</code>, <code>Event::StartNodeAt</code>, and the line from the <code>match</code> in <code>Sink::finish</code> that handles <code>Event::StartNodeAt</code>.</p>
-<p>Thanks for following this series up to here! The next part will consist of a few refactorings to keep the code clean.</p>
-<section class=footnotes role=doc-endnotes>
-<hr>
-<ol>
-<li id=fn:1 role=doc-endnote>
-<p>It would be ideal if this was a compile time error; <em>linear typing</em> is the ability of a language to enforce at compile time that objects are used once, not more or less, and would come in handy here.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p>
-</li>
-</ol>
-</section>
-</main>
-<nav class=page-navigation>
-<div class=prev>
-<p class=hint>Previously</p>
-<a href=https://arzg.github.io/lang/14/>Part Fourteen: Comments</a>
-</div>
-<div class=next>
-<p class=hint>Next up</p>
-<a href=https://arzg.github.io/lang/16/>Part Sixteen: Refactoring</a>
-</div>
-<div style=clear:both></div>
-</nav>
-</body>
-</html>
+</code></pre><p>All that’s left is to delete <code>Parser::start_node</code>, <code>Parser::start_node_at</code>, <code>Parser::finish_node</code>, <code>Parser::checkpoint</code>, <code>Event::StartNodeAt</code>, and the line from the <code>match</code> in <code>Sink::finish</code> that handles <code>Event::StartNodeAt</code>.</p><p>Thanks for following this series up to here! The next part will consist of a few refactorings to keep the code clean.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>It would be ideal if this was a compile time error; <em>linear typing</em> is the ability of a language to enforce at compile time that objects are used once, not more or less, and would come in handy here.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/14/>Part Fourteen: Comments</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/16/>Part Sixteen: Refactoring</a></div><div style=clear:both></div></nav></body></html>
