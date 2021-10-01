@@ -1,6 +1,8 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Twenty: Testing · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.b763c3746f235d1e84e23bc1b3d94a46534216d5bbae8ce5b8ae93e8c0816df3.css integrity="sha256-t2PDdG8jXR6E4jvBs9lKRlNCFtW7rozluK6T6MCBbfM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Twenty: Testing · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.04c23afe51262a10ee61829da41f4d7318ff311ed0d0bcbf1db0fde96e3830f4.css integrity="sha256-BMI6/lEmKhDuYYKdpB9Ncxj/MR7Q0Ly/HbD96W44MPQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Twenty: Testing</h1><section class=page-info><ul><li>27 January 2021</li><li>2684 words</li><li>13 minute read</li></ul></section></header><main><p>I was disciplined with my TDD throughout the early parts of this series &ndash; I think this was helpful. Unfortunately, testing has fallen by the wayside in some recent parts; especially the last one. I would like to get back into the habit of TDD, and so I should add tests to areas of the codebase that are missing them.</p><h1 id=a-weird-compilation-failure>A weird compilation failure</h1><p>First off, a small erratum: it turns out that Eldiro fails to compile when the entire workspace’s tests are run:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t
+<script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Twenty: Testing</h1><section class=page-info><ul><li>27 January 2021</li><li>3783 words</li><li>19 minute read</li></ul></section></header><main><p>I was disciplined with my TDD throughout the early parts of this series &ndash; I think this was helpful. Unfortunately, testing has fallen by the wayside in some recent parts; especially the last one. I would like to get back into the habit of TDD, and so I should add tests to areas of the codebase that are missing them.</p><h1 id=a-weird-compilation-failure>A weird compilation failure</h1><p>First off, a small erratum: it turns out that Eldiro fails to compile when the entire workspace’s tests are run:</p><pre><code class=language-->$ cargo t
 # snip
 error[E0659]: `parser` is ambiguous (name vs any other name during import resolution)
  --&gt; /home/me/src/eldiro/crates/parser/src/lib.rs:8:5
@@ -18,180 +20,180 @@ note: `parser` could also refer to the module defined here
   = help: use `crate::parser` to refer to this module unambiguously
 
 error: aborting due to previous error
-</code></pre><p>This is because we have both a module and a crate with the same name, so the import is ambiguous. I’m unsure why this error doesn’t appear with <code>cargo build</code>, but we should fix it anyway:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>grammar</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=p>{</span><span class=n>ParseError</span><span class=p>,</span><span class=w> </span><span class=n>Parser</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Lexer</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span></code></pre></div><h1 id=updates-to-rowan>Updates to Rowan</h1><p>Due to a flurry of activity focused on performance, Rowan has had two breaking changes recently. Let’s update both of our crates that depend on Rowan to point to the new version:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/syntax/Cargo.toml</span>
+</code></pre><p>This is because we have both a module and a crate with the same name, so the import is ambiguous. I’m unsure why this error doesn’t appear with <code>cargo build</code>, but we should fix it anyway:</p><pre><code class=language-rust>// crates/parser/src/lib.rs
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>num-derive</span> <span class=p>=</span> <span class=s2>&#34;0.3.3&#34;</span>
-<span class=nx>num-traits</span> <span class=p>=</span> <span class=s2>&#34;0.2.14&#34;</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.12.1&#34;</span>
-</code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/parser/Cargo.toml</span>
+mod event;
+mod grammar;
+mod parser;
+mod sink;
+mod source;
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.12.1&#34;</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
-<span class=nx>text-size</span> <span class=p>=</span> <span class=s2>&#34;1.0.0&#34;</span>
-</code></pre></div><p>Thanks to Rust’s static type system and helpful error messages, updating dependencies is a breeze. The only error this change has resulted in is in <code>VariableRef::name</code>. Rowan switched from returning <code>&SmolStr</code> from <code>SyntaxToken::text</code> to returning a simple <code>&str</code>. Let’s update <code>VariableRef::name</code> to convert the <code>&str</code> to a <code>SmolStr</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>SmolStr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>into</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>All the other AST methods return <code>SyntaxNode</code>s, <code>SyntaxToken</code>s or data types that contain them; let’s return the <code>VariableRef</code>’s first child token directly for consistency:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>name</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxToken</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This allows us to remove <code>ast</code>’s <code>smol_str</code> dependency:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxElement</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxNode</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxToken</span><span class=p>};</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+use crate::parser::{ParseError, Parser};
+use lexer::Lexer;
+use rowan::GreenNode;
+use sink::Sink;
+use source::Source;
+use syntax::SyntaxNode;
+</code></pre><h1 id=updates-to-rowan>Updates to Rowan</h1><p>Due to a flurry of activity focused on performance, Rowan has had two breaking changes recently. Let’s update both of our crates that depend on Rowan to point to the new version:</p><pre><code class=language-toml># crates/syntax/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
-</code></pre></div><p>Next, we have a usage of <code>VariableRef::name</code> that we have to update:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/database.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower_expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>ast</span>::<span class=n>Expr</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>var</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>That match arm is longer than one line; let’s extract it to a method for consistency:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower_expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=n>ast</span>::<span class=n>Expr</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>                </span><span class=n>ast</span>::<span class=n>Expr</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lower_variable_ref</span><span class=p>(</span><span class=n>ast</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_ref</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>VariableRef</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>var</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Updating Rowan has given us one more error related to <code>SmolStr</code> vs <code>&str</code>. It’s a trivial fix &ndash; all we have to do is change a <code>.clone()</code> to an <code>.into()</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>lower_stmt</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>ast</span>: <span class=nc>ast</span>::<span class=n>Stmt</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Stmt</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>result</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=nc>ast</span><span class=p>.</span><span class=n>name</span><span class=p>()</span><span class=o>?</span><span class=p>.</span><span class=n>text</span><span class=p>().</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>value</span>: <span class=nc>self</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=n>ast</span><span class=p>.</span><span class=n>value</span><span class=p>()),</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>        </span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>result</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Running <code>cargo clippy</code> reveals that there is an occurrence where we were converting a <code>&str</code> to a <code>SmolStr</code> using <code>.into()</code> &ndash; now that the type has changed to <code>&str</code>, this <code>.into()</code> call does not have an effect. Let’s remove it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>token</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Token</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>.</span><span class=n>into</span><span class=p>()),</span><span class=w> </span><span class=n>text</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><h1 id=tests-for-lowering>Tests for lowering</h1><p>Let’s write a test for lowering a variable definition:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/database.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>ast</span>::<span class=n>Root</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>parser</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>syntax</span><span class=p>()).</span><span class=n>unwrap</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_def</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=s>&#34;let foo = bar&#34;</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>next</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>hir</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>().</span><span class=n>lower_stmt</span><span class=p>(</span><span class=n>ast</span><span class=p>).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>hir</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=s>&#34;foo&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>value</span>: <span class=nc>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=s>&#34;bar&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how we need a <code>SyntaxNode</code> to create an <code>ast::Root</code>, from which we then extract an <code>ast::Stmt</code> for lowering. We can only create this <code>SyntaxNode</code> by parsing source code, so we have to depend on <code>parser</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+[dependencies]
+lexer = {path = &quot;../lexer&quot;}
+num-derive = &quot;0.3.3&quot;
+num-traits = &quot;0.2.14&quot;
+rowan = &quot;0.12.1&quot;
+</code></pre><pre><code class=language-toml># crates/parser/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../ast&#34;</span><span class=p>}</span>
-<span class=nx>la-arena</span> <span class=p>=</span> <span class=s2>&#34;0.2.0&#34;</span>
-<span class=nx>smol_str</span> <span class=p>=</span> <span class=s2>&#34;0.1.17&#34;</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+[dependencies]
+drop_bomb = &quot;0.1.5&quot;
+lexer = {path = &quot;../lexer&quot;}
+rowan = &quot;0.12.1&quot;
+syntax = {path = &quot;../syntax&quot;}
+text-size = &quot;1.0.0&quot;
+</code></pre><p>Thanks to Rust’s static type system and helpful error messages, updating dependencies is a breeze. The only error this change has resulted in is in <code>VariableRef::name</code>. Rowan switched from returning <code>&SmolStr</code> from <code>SyntaxToken::text</code> to returning a simple <code>&str</code>. Let’s update <code>VariableRef::name</code> to convert the <code>&str</code> to a <code>SmolStr</code>:</p><pre><code class=language-rust>// crates/ast/src/lib.rs
 
-<span class=p>[</span><span class=nx>dev-dependencies</span><span class=p>]</span>
-<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
-</code></pre></div><p>We have an error about <code>Stmt</code> not implementing <code>PartialEq</code>, which we can derive for it and other HIR types:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Stmt</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>BinaryOp</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>UnaryOp</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
+impl VariableRef {
+    pub fn name(&amp;self) -&gt; SmolStr {
+        self.0.first_token().unwrap().text().into()
+    }
+}
+</code></pre><p>All the other AST methods return <code>SyntaxNode</code>s, <code>SyntaxToken</code>s or data types that contain them; let’s return the <code>VariableRef</code>’s first child token directly for consistency:</p><pre><code class=language-rust>impl VariableRef {
+    pub fn name(&amp;self) -&gt; Option&lt;SyntaxToken&gt; {
+        self.0.first_token()
+    }
+}
+</code></pre><p>This allows us to remove <code>ast</code>’s <code>smol_str</code> dependency:</p><pre><code class=language-rust>use syntax::{SyntaxElement, SyntaxKind, SyntaxNode, SyntaxToken};
+</code></pre><pre><code class=language-toml># Cargo.toml
+
+[dependencies]
+syntax = {path = &quot;../syntax&quot;}
+</code></pre><p>Next, we have a usage of <code>VariableRef::name</code> that we have to update:</p><pre><code class=language-rust>// crates/hir/src/database.rs
+
+impl Database {
+    // snip
+
+    pub(crate) fn lower_expr(&amp;mut self, ast: Option&lt;ast::Expr&gt;) -&gt; Expr {
+        if let Some(ast) = ast {
+            match ast {
+                // snip
+                ast::Expr::VariableRef(ast) =&gt; Expr::VariableRef {
+                    var: ast.name().unwrap().text().into(),
+                },
+            }
+        } else {
+            // snip
+        }
+    }
+
+    // snip
+}
+</code></pre><p>That match arm is longer than one line; let’s extract it to a method for consistency:</p><pre><code class=language-rust>impl Database {
+    // snip
+
+    pub(crate) fn lower_expr(&amp;mut self, ast: Option&lt;ast::Expr&gt;) -&gt; Expr {
+        if let Some(ast) = ast {
+            match ast {
+                // snip
+                ast::Expr::VariableRef(ast) =&gt; self.lower_variable_ref(ast),
+            }
+        } else {
+            // snip
+        }
+    }
+
+    // snip
+
+    fn lower_variable_ref(&amp;mut self, ast: ast::VariableRef) -&gt; Expr {
+        Expr::VariableRef {
+            var: ast.name().unwrap().text().into(),
+        }
+    }
+}
+</code></pre><p>Updating Rowan has given us one more error related to <code>SmolStr</code> vs <code>&str</code>. It’s a trivial fix &ndash; all we have to do is change a <code>.clone()</code> to an <code>.into()</code>:</p><pre><code class=language-rust>impl Database {
+    pub(crate) fn lower_stmt(&amp;mut self, ast: ast::Stmt) -&gt; Option&lt;Stmt&gt; {
+        let result = match ast {
+            ast::Stmt::VariableDef(ast) =&gt; Stmt::VariableDef {
+                name: ast.name()?.text().into(),
+                value: self.lower_expr(ast.value()),
+            },
+            // snip
+        };
+
+        Some(result)
+    }
+
+    // snip
+}
+</code></pre><p>Running <code>cargo clippy</code> reveals that there is an occurrence where we were converting a <code>&str</code> to a <code>SmolStr</code> using <code>.into()</code> &ndash; now that the type has changed to <code>&str</code>, this <code>.into()</code> call does not have an effect. Let’s remove it:</p><pre><code class=language-rust>// crates/parser/src/sink.rs
+
+impl&lt;'t, 'input&gt; Sink&lt;'t, 'input&gt; {
+    // snip
+
+    fn token(&amp;mut self) {
+        let Token { kind, text, .. } = self.tokens[self.cursor];
+
+        self.builder
+            .token(EldiroLanguage::kind_to_raw(kind.into()), text);
+
+        self.cursor += 1;
+    }
+}
+</code></pre><h1 id=tests-for-lowering>Tests for lowering</h1><p>Let’s write a test for lowering a variable definition:</p><pre><code class=language-rust>// crates/hir/src/database.rs
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &amp;str) -&gt; ast::Root {
+        ast::Root::cast(parser::parse(input).syntax()).unwrap()
+    }
+
+    #[test]
+    fn lower_variable_def() {
+        let root = parse(&quot;let foo = bar&quot;);
+        let ast = root.stmts().next().unwrap();
+        let hir = Database::default().lower_stmt(ast).unwrap();
+
+        assert_eq!(
+            hir,
+            Stmt::VariableDef {
+                name: &quot;foo&quot;.into(),
+                value: Expr::VariableRef { var: &quot;bar&quot;.into() },
+            },
+        );
+    }
+}
+</code></pre><p>Note how we need a <code>SyntaxNode</code> to create an <code>ast::Root</code>, from which we then extract an <code>ast::Stmt</code> for lowering. We can only create this <code>SyntaxNode</code> by parsing source code, so we have to depend on <code>parser</code>:</p><pre><code class=language-toml># Cargo.toml
+
+[dependencies]
+ast = {path = &quot;../ast&quot;}
+la-arena = &quot;0.2.0&quot;
+smol_str = &quot;0.1.17&quot;
+syntax = {path = &quot;../syntax&quot;}
+
+[dev-dependencies]
+parser = {path = &quot;../parser&quot;}
+</code></pre><p>We have an error about <code>Stmt</code> not implementing <code>PartialEq</code>, which we can derive for it and other HIR types:</p><pre><code class=language-rust>// lib.rs
+
+#[derive(Debug, PartialEq)]
+pub enum Stmt {
+    // snip
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Expr {
+    // snip
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinaryOp {
+    // snip
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOp {
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q --lib
 
 running 0 tests
 
@@ -216,195 +218,195 @@ test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 0 tests
 
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Writing tests for each of the other HIR elements will be easier if we write some helper functions:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// database.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq, Default)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Database</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>ast</span>::<span class=n>Root</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>parser</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>syntax</span><span class=p>()).</span><span class=n>unwrap</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check_stmt</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_hir</span>: <span class=nc>Stmt</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>next</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>hir</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>().</span><span class=n>lower_stmt</span><span class=p>(</span><span class=n>ast</span><span class=p>).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>hir</span><span class=p>,</span><span class=w> </span><span class=n>expected_hir</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check_expr</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_hir</span>: <span class=nc>Expr</span><span class=p>,</span><span class=w> </span><span class=n>expected_database</span>: <span class=nc>Database</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>first_stmt</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>next</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>first_stmt</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>ast</span>::<span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>ast</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>ast</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>};</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>database</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>hir</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>database</span><span class=p>.</span><span class=n>lower_expr</span><span class=p>(</span><span class=nb>Some</span><span class=p>(</span><span class=n>ast</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>hir</span><span class=p>,</span><span class=w> </span><span class=n>expected_hir</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>database</span><span class=p>,</span><span class=w> </span><span class=n>expected_database</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_def</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_stmt</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;let foo = bar&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=s>&#34;foo&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>value</span>: <span class=nc>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=s>&#34;bar&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q -p hir --lib
+</code></pre><p>Writing tests for each of the other HIR elements will be easier if we write some helper functions:</p><pre><code class=language-rust>// database.rs
+
+#[derive(Debug, PartialEq, Default)]
+pub struct Database {
+    // snip
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(input: &amp;str) -&gt; ast::Root {
+        ast::Root::cast(parser::parse(input).syntax()).unwrap()
+    }
+
+    fn check_stmt(input: &amp;str, expected_hir: Stmt) {
+        let root = parse(input);
+        let ast = root.stmts().next().unwrap();
+        let hir = Database::default().lower_stmt(ast).unwrap();
+
+        assert_eq!(hir, expected_hir);
+    }
+
+    fn check_expr(input: &amp;str, expected_hir: Expr, expected_database: Database) {
+        let root = parse(input);
+        let first_stmt = root.stmts().next().unwrap();
+        let ast = match first_stmt {
+            ast::Stmt::Expr(ast) =&gt; ast,
+            _ =&gt; unreachable!(),
+        };
+        let mut database = Database::default();
+        let hir = database.lower_expr(Some(ast));
+
+        assert_eq!(hir, expected_hir);
+        assert_eq!(database, expected_database);
+    }
+
+    #[test]
+    fn lower_variable_def() {
+        check_stmt(
+            &quot;let foo = bar&quot;,
+            Stmt::VariableDef {
+                name: &quot;foo&quot;.into(),
+                value: Expr::VariableRef { var: &quot;bar&quot;.into() },
+            },
+        );
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q -p hir --lib
 
 running 1 test
 .
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write tests for each of the remaining HIR elements:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_expr_stmt</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_stmt</span><span class=p>(</span><span class=s>&#34;123&#34;</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>123</span><span class=w> </span><span class=p>}));</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary_expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Arena</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>1</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>rhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>2</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;1 + 2&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>lhs</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>rhs</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>BinaryOp</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_literal</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=s>&#34;999&#34;</span><span class=p>,</span><span class=w> </span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>999</span><span class=w> </span><span class=p>},</span><span class=w> </span><span class=n>Database</span>::<span class=n>default</span><span class=p>());</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_paren_expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;((((((abc))))))&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=s>&#34;abc&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span>::<span class=n>default</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary_expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Arena</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>ten</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>10</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;-10&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>expr</span>: <span class=nc>ten</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>UnaryOp</span>::<span class=n>Neg</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_ref</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;foo&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>var</span>: <span class=s>&#34;foo&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>()</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span>::<span class=n>default</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q -p hir --lib
+</code></pre><p>Let’s write tests for each of the remaining HIR elements:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn lower_expr_stmt() {
+        check_stmt(&quot;123&quot;, Stmt::Expr(Expr::Literal { n: 123 }));
+    }
+
+    #[test]
+    fn lower_binary_expr() {
+        let mut exprs = Arena::new();
+        let lhs = exprs.alloc(Expr::Literal { n: 1 });
+        let rhs = exprs.alloc(Expr::Literal { n: 2 });
+
+        check_expr(
+            &quot;1 + 2&quot;,
+            Expr::Binary {
+                lhs,
+                rhs,
+                op: BinaryOp::Add,
+            },
+            Database { exprs },
+        );
+    }
+
+    #[test]
+    fn lower_literal() {
+        check_expr(&quot;999&quot;, Expr::Literal { n: 999 }, Database::default());
+    }
+
+    #[test]
+    fn lower_paren_expr() {
+        check_expr(
+            &quot;((((((abc))))))&quot;,
+            Expr::VariableRef { var: &quot;abc&quot;.into() },
+            Database::default(),
+        );
+    }
+
+    #[test]
+    fn lower_unary_expr() {
+        let mut exprs = Arena::new();
+        let ten = exprs.alloc(Expr::Literal { n: 10 });
+
+        check_expr(
+            &quot;-10&quot;,
+            Expr::Unary {
+                expr: ten,
+                op: UnaryOp::Neg,
+            },
+            Database { exprs },
+        );
+    }
+
+    #[test]
+    fn lower_variable_ref() {
+        check_expr(
+            &quot;foo&quot;,
+            Expr::VariableRef { var: &quot;foo&quot;.into() },
+            Database::default(),
+        );
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q -p hir --lib
 
 running 7 tests
 .......
 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>So far our tests have only included the ‘happy path’, or cases where everything has gone as it should. Let’s add some test cases where the input is malformed, to make sure lowering doesn’t break when the user is typing:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_def_without_name</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=s>&#34;let = 10&#34;</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>ast</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>().</span><span class=n>next</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>Database</span>::<span class=n>default</span><span class=p>().</span><span class=n>lower_stmt</span><span class=p>(</span><span class=n>ast</span><span class=p>).</span><span class=n>is_none</span><span class=p>());</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_variable_def_without_value</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check_stmt</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;let a =&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=s>&#34;a&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>value</span>: <span class=nc>Expr</span>::<span class=n>Missing</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_binary_expr_without_rhs</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Arena</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>n</span>: <span class=mi>10</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>rhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Missing</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;10 -&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>Binary</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>lhs</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>rhs</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>BinaryOp</span>::<span class=n>Sub</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>lower_unary_expr_without_expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Arena</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>expr</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>exprs</span><span class=p>.</span><span class=n>alloc</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Missing</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>check_expr</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;-&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>Unary</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>expr</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>UnaryOp</span>::<span class=n>Neg</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=n>Database</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>exprs</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q -p hir --lib
+</code></pre><p>So far our tests have only included the ‘happy path’, or cases where everything has gone as it should. Let’s add some test cases where the input is malformed, to make sure lowering doesn’t break when the user is typing:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn lower_variable_def_without_name() {
+        let root = parse(&quot;let = 10&quot;);
+        let ast = root.stmts().next().unwrap();
+        assert!(Database::default().lower_stmt(ast).is_none());
+    }
+
+    #[test]
+    fn lower_variable_def_without_value() {
+        check_stmt(
+            &quot;let a =&quot;,
+            Stmt::VariableDef {
+                name: &quot;a&quot;.into(),
+                value: Expr::Missing,
+            },
+        );
+    }
+
+    // snip
+
+    #[test]
+    fn lower_binary_expr_without_rhs() {
+        let mut exprs = Arena::new();
+        let lhs = exprs.alloc(Expr::Literal { n: 10 });
+        let rhs = exprs.alloc(Expr::Missing);
+
+        check_expr(
+            &quot;10 -&quot;,
+            Expr::Binary {
+                lhs,
+                rhs,
+                op: BinaryOp::Sub,
+            },
+            Database { exprs },
+        );
+    }
+
+    // snip
+
+    #[test]
+    fn lower_unary_expr_without_expr() {
+        let mut exprs = Arena::new();
+        let expr = exprs.alloc(Expr::Missing);
+
+        check_expr(
+            &quot;-&quot;,
+            Expr::Unary {
+                expr,
+                op: UnaryOp::Neg,
+            },
+            Database { exprs },
+        );
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q -p hir --lib
 
 running 11 tests
 ...........
 test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=testing-the-parser>Testing the parser</h1><p>The parser’s current test suite is quite extensive; however, we might have missed some problematic inputs. The same goes for lowering, too.</p><p>A <em>fuzzer</em> is a program that generates random inputs to another program with the purpose of findings bugs in it. This is perfect for testing our parsing and lowering code. Let’s install cargo-fuzz, a tool that makes it easy to run fuzzers on Rust code. Unfortunately, the fuzzing engine we’ll be using, libFuzzer, only supports x86-64 Linux and x86-64 macOS.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo install cargo-fuzz
-</code></pre><p>Now that cargo-fuzz is installed, we can create a crate to house our fuzzer. We don’t want the fuzzer to be part of the workspace, so we’ll create our fuzzing crate outside of <code>crates/</code>:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo new --bin fuzz
+</code></pre><h1 id=testing-the-parser>Testing the parser</h1><p>The parser’s current test suite is quite extensive; however, we might have missed some problematic inputs. The same goes for lowering, too.</p><p>A <em>fuzzer</em> is a program that generates random inputs to another program with the purpose of findings bugs in it. This is perfect for testing our parsing and lowering code. Let’s install cargo-fuzz, a tool that makes it easy to run fuzzers on Rust code. Unfortunately, the fuzzing engine we’ll be using, libFuzzer, only supports x86-64 Linux and x86-64 macOS.</p><pre><code class=language-->$ cargo install cargo-fuzz
+</code></pre><p>Now that cargo-fuzz is installed, we can create a crate to house our fuzzer. We don’t want the fuzzer to be part of the workspace, so we’ll create our fuzzing crate outside of <code>crates/</code>:</p><pre><code class=language-->$ cargo new --bin fuzz
 warning: compiling this new crate may not work due to invalid workspace configuration
 
 current package believes it's in a workspace when it's not:
@@ -414,48 +416,48 @@ workspace: /home/me/src/eldiro/Cargo.toml
 this may be fixable by adding `fuzz` to the `workspace.members` array of the manifest located at: /home/me/src/eldiro/Cargo.toml
 Alternatively, to keep it out of the workspace, add the package to the `workspace.exclude` array, or add an empty `[workspace]` table to the package's manifest.
      Created binary (application) `fuzz` package
-</code></pre><p>Let’s address that warning:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># fuzz/Cargo.toml</span>
+</code></pre><p>Let’s address that warning:</p><pre><code class=language-toml># fuzz/Cargo.toml
 
-<span class=p>[</span><span class=nx>workspace</span><span class=p>]</span>
-</code></pre></div><p>cargo-fuzz has the concept of a <em>fuzz target,</em> which is a program that receives random data from the fuzzer and tries to run some other code. Let’s create a fuzz target for parsing and lowering:</p><pre tabindex=0><code class=language-- data-lang=->$ rm -r fuzz/src
+[workspace]
+</code></pre><p>cargo-fuzz has the concept of a <em>fuzz target,</em> which is a program that receives random data from the fuzzer and tries to run some other code. Let’s create a fuzz target for parsing and lowering:</p><pre><code class=language-->$ rm -r fuzz/src
 $ mkdir fuzz/fuzz_targets
-</code></pre><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># fuzz/Cargo.toml</span>
+</code></pre><pre><code class=language-toml># fuzz/Cargo.toml
 
-<span class=p>[[</span><span class=nx>bin</span><span class=p>]]</span>
-<span class=nx>name</span> <span class=p>=</span> <span class=s2>&#34;parse_lower&#34;</span>
-<span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;fuzz_targets/parse_lower.rs&#34;</span>
-</code></pre></div><p>To write a fuzz target, we need to depend on libFuzzer:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>libfuzzer-sys</span> <span class=p>=</span> <span class=s2>&#34;0.3&#34;</span>
-</code></pre></div><p>And define it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// fuzz/fuzz_targets/parse_lower.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#![no_main]</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>libfuzzer_sys</span>::<span class=n>fuzz_target</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=n>fuzz_target</span><span class=o>!</span><span class=p>(</span><span class=o>|</span><span class=n>data</span>: <span class=kp>&amp;</span><span class=p>[</span><span class=kt>u8</span><span class=p>]</span><span class=o>|</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Ok</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>std</span>::<span class=kt>str</span>::<span class=n>from_utf8</span><span class=p>(</span><span class=n>data</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span>::<span class=n>parse</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>()).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>_database</span><span class=p>,</span><span class=w> </span><span class=n>_stmts</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>hir</span>::<span class=n>lower</span><span class=p>(</span><span class=n>root</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>});</span><span class=w>
-</span></code></pre></div><p>Note how libFuzzer gives us random bytes, and we can only run the parser and lower the syntax tree if those bytes are valid UTF-8. Let’s add those missing dependencies:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+[[bin]]
+name = &quot;parse_lower&quot;
+path = &quot;fuzz_targets/parse_lower.rs&quot;
+</code></pre><p>To write a fuzz target, we need to depend on libFuzzer:</p><pre><code class=language-toml>[dependencies]
+libfuzzer-sys = &quot;0.3&quot;
+</code></pre><p>And define it:</p><pre><code class=language-rust>// fuzz/fuzz_targets/parse_lower.rs
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>ast</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../crates/ast&#34;</span><span class=p>}</span>
-<span class=nx>hir</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../crates/hir&#34;</span><span class=p>}</span>
-<span class=nx>libfuzzer-sys</span> <span class=p>=</span> <span class=s2>&#34;0.3&#34;</span>
-<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../crates/parser&#34;</span><span class=p>}</span>
-</code></pre></div><p>Finally, to use the fuzz target in our <code>fuzz</code> crate, we need to declare that the crate is meant to be used with cargo-fuzz:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=p>[</span><span class=nx>package</span><span class=p>.</span><span class=nx>metadata</span><span class=p>]</span>
-<span class=nx>cargo-fuzz</span> <span class=p>=</span> <span class=kc>true</span>
-</code></pre></div><p>cargo-fuzz uses nightly compiler features; we’ll set an override for the <code>fuzz</code> crate only:</p><pre tabindex=0><code class=language-- data-lang=->$ rustup override set --path fuzz nightly
+#![no_main]
+
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|data: &amp;[u8]| {
+    if let Ok(s) = std::str::from_utf8(data) {
+        let parse = parser::parse(s);
+        let root = ast::Root::cast(parse.syntax()).unwrap();
+        let (_database, _stmts) = hir::lower(root);
+    }
+});
+</code></pre><p>Note how libFuzzer gives us random bytes, and we can only run the parser and lower the syntax tree if those bytes are valid UTF-8. Let’s add those missing dependencies:</p><pre><code class=language-toml># Cargo.toml
+
+[dependencies]
+ast = {path = &quot;../crates/ast&quot;}
+hir = {path = &quot;../crates/hir&quot;}
+libfuzzer-sys = &quot;0.3&quot;
+parser = {path = &quot;../crates/parser&quot;}
+</code></pre><p>Finally, to use the fuzz target in our <code>fuzz</code> crate, we need to declare that the crate is meant to be used with cargo-fuzz:</p><pre><code class=language-toml>[package.metadata]
+cargo-fuzz = true
+</code></pre><p>cargo-fuzz uses nightly compiler features; we’ll set an override for the <code>fuzz</code> crate only:</p><pre><code class=language-->$ rustup override set --path fuzz nightly
 info: using existing install for 'nightly-x86_64-apple-darwin'
 info: override toolchain for 'fuzz' set to 'nightly-x86_64-apple-darwin'
 
   nightly-x86_64-apple-darwin unchanged - rustc 1.51.0-nightly (1d0d76f8d 2021-01-24)
-</code></pre><p>Cool! And, finally, we can run the fuzzer:</p><pre tabindex=0><code class=language-- data-lang=->$ cd fuzz
+</code></pre><p>Cool! And, finally, we can run the fuzzer:</p><pre><code class=language-->$ cd fuzz
 $ cargo fuzz run parse_lower
-</code></pre><p>A ton of output will fly across the screen as the fuzzer tries random inputs. The lines starting with <code>NEW</code> are when the fuzzer is generating new inputs, and the ones starting with <code>REDUCE</code> are those in which the fuzzer tries to make the input smaller and simpler while covering the same codepaths. libFuzzer is an LLVM project, so it makes sense that it would have deep insights into the program’s execution.</p><p>The fuzzer found a bug in around one second of fuzzing on my machine; here’s the report:</p><pre tabindex=0><code class=language-- data-lang=->thread '&lt;unnamed&gt;' panicked at 'called `Result::unwrap()` on an `Err` value: ParseIntError { kind: PosOverflow }', /home/me/src/eldiro/crates/ast/src/lib.rs:107:54
+</code></pre><p>A ton of output will fly across the screen as the fuzzer tries random inputs. The lines starting with <code>NEW</code> are when the fuzzer is generating new inputs, and the ones starting with <code>REDUCE</code> are those in which the fuzzer tries to make the input smaller and simpler while covering the same codepaths. libFuzzer is an LLVM project, so it makes sense that it would have deep insights into the program’s execution.</p><p>The fuzzer found a bug in around one second of fuzzing on my machine; here’s the report:</p><pre><code class=language-->thread '&lt;unnamed&gt;' panicked at 'called `Result::unwrap()` on an `Err` value: ParseIntError { kind: PosOverflow }', /home/me/src/eldiro/crates/ast/src/lib.rs:107:54
 
 # snip backtrace
 
@@ -478,359 +480,359 @@ Minimize test case with:
 	cargo fuzz tmin parse_lower artifacts/parse_lower/crash-3ea7d538477b2fa5533ed073970deff99fec39d5
 
 ────────────────────────────────────────────────────────────────────────────────
-</code></pre><p>Let’s take a look at the failing input:</p><pre tabindex=0><code class=language-- data-lang=->$ cat artifacts/parse_lower/crash-3ea7d538477b2fa5533ed073970deff99fec39d5
+</code></pre><p>Let’s take a look at the failing input:</p><pre><code class=language-->$ cat artifacts/parse_lower/crash-3ea7d538477b2fa5533ed073970deff99fec39d5
 x*5x*55500867563550086756346077-]-
-</code></pre><p>Let’s take a look at what we know:</p><ul><li>the input has a long sequence of numbers in it</li><li>the panic message mentioned a <code>ParseIntError</code></li></ul><p>This makes me think that, when we try to parse an integer out of the source code, the standard library’s integer parser realises that the parsed integer would be larger than the integer type’s maximum value. The panic message points to line 107 of <code>crates/ast/src/lib.rs</code>, which, sure enough, is where we parse integer literals:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>u64</span> <span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>parse</span><span class=p>().</span><span class=n>unwrap</span><span class=p>()</span><span class=w> </span><span class=c1>// line 107
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The solution to this is twofold:</p><ul><li>we should add semantic validation to the AST, so that non-syntactic errors like this can be caught</li><li>analysis needs to continue in spite of these errors, so <code>ast::Literal::parse</code> and <code>hir::Expr::Literal</code> should be <code>Option&lt;u64></code></li></ul><h1 id=ast-validation>AST validation</h1><p>It’s great that the fuzzer found this bug for us so quickly! Let’s create a <code>validation</code> module in the <code>ast</code> crate:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>validation</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>We’ll traverse down into expressions across the entire AST, validating them as we go:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/validation.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>Root</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>validate</span><span class=p>(</span><span class=n>root</span>: <span class=nc>Root</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>for</span><span class=w> </span><span class=n>stmt</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>stmt</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>variable_def</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>variable_def</span><span class=p>.</span><span class=n>value</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s define <code>validate_expr</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>Expr</span><span class=p>,</span><span class=w> </span><span class=n>Root</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>validate_expr</span><span class=p>(</span><span class=n>expr</span>: <span class=nc>Expr</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>binary_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>binary_expr</span><span class=p>.</span><span class=n>lhs</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>binary_expr</span><span class=p>.</span><span class=n>rhs</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>literal</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=o>???</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>paren_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>paren_expr</span><span class=p>.</span><span class=n>expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>unary_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>unary_expr</span><span class=p>.</span><span class=n>expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>VariableRef</span><span class=p>(</span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>How can we actually check if a number literal is greater than <code>u64::MAX</code>? We can’t parse the number and then check, because we would then run into the bug we’re trying to fix! Instead, we’ll report an error when parsing the number fails, since we know the only reason parsing can fail is if the number literal is too large:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>validate_expr</span><span class=p>(</span><span class=n>expr</span>: <span class=nc>Expr</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>literal</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=n>literal</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>is_none</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// report error
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This forces us to make that other change from earlier:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=kt>u64</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text</span><span class=p>().</span><span class=n>parse</span><span class=p>().</span><span class=n>ok</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s update the HIR to store an <code>Option&lt;u64></code> so that analysis can continue in spite of the invalid number literal:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/hir/src/lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=sd>/// is `None` if the number is too big to fit in a u64
-</span><span class=sd></span><span class=w>        </span><span class=n>n</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=kt>u64</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Unfortunately, we have a number of errors from the lowering tests depending on <code>n</code> being a <code>u64</code>. The errors are straightforward and just involve wrapping numbers in <code>Some()</code>, so I won’t show how to solve them here. Take a look at the <a href=https://github.com/arzg/eldiro/commit/4ade2fd7f12135d94feffaefc490d7e1c67e0b64>diff on GitHub</a> if you get stuck.</p><p>We need a new type to represent validation errors:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/ast/src/validation.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>Expr</span><span class=p>,</span><span class=w> </span><span class=n>Root</span><span class=p>,</span><span class=w> </span><span class=n>Stmt</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>message</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>range</span>: <span class=nc>TextRange</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+</code></pre><p>Let’s take a look at what we know:</p><ul><li>the input has a long sequence of numbers in it</li><li>the panic message mentioned a <code>ParseIntError</code></li></ul><p>This makes me think that, when we try to parse an integer out of the source code, the standard library’s integer parser realises that the parsed integer would be larger than the integer type’s maximum value. The panic message points to line 107 of <code>crates/ast/src/lib.rs</code>, which, sure enough, is where we parse integer literals:</p><pre><code class=language-rust>impl Literal {
+    pub fn parse(&amp;self) -&gt; u64 {
+        self.0.first_token().unwrap().text().parse().unwrap() // line 107
+    }
+}
+</code></pre><p>The solution to this is twofold:</p><ul><li>we should add semantic validation to the AST, so that non-syntactic errors like this can be caught</li><li>analysis needs to continue in spite of these errors, so <code>ast::Literal::parse</code> and <code>hir::Expr::Literal</code> should be <code>Option&lt;u64></code></li></ul><h1 id=ast-validation>AST validation</h1><p>It’s great that the fuzzer found this bug for us so quickly! Let’s create a <code>validation</code> module in the <code>ast</code> crate:</p><pre><code class=language-rust>// crates/ast/src/lib.rs
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
-<span class=nx>text-size</span> <span class=p>=</span> <span class=s2>&#34;1.1.0&#34;</span>
-</code></pre></div><p>Let’s store a <code>Vec</code> of these, pushing to it as we go:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// validation.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>validate</span><span class=p>(</span><span class=n>root</span>: <span class=nc>Root</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ValidationError</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>errors</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>Vec</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>for</span><span class=w> </span><span class=n>stmt</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>root</span><span class=p>.</span><span class=n>stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>stmt</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>VariableDef</span><span class=p>(</span><span class=n>variable_def</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>variable_def</span><span class=p>.</span><span class=n>value</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>errors</span><span class=p>);</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>errors</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>errors</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>validate_expr</span><span class=p>(</span><span class=n>expr</span>: <span class=nc>Expr</span><span class=p>,</span><span class=w> </span><span class=n>errors</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ValidationError</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>match</span><span class=w> </span><span class=n>expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>BinaryExpr</span><span class=p>(</span><span class=n>binary_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>binary_expr</span><span class=p>.</span><span class=n>lhs</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=n>errors</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>binary_expr</span><span class=p>.</span><span class=n>rhs</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=n>errors</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>Literal</span><span class=p>(</span><span class=n>literal</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=n>literal</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>is_none</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>errors</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>message</span>: <span class=nc>format</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>                        </span><span class=s>&#34;number literal is larger than an integer’s maximum value, {}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                        </span><span class=kt>u64</span>::<span class=n>MAX</span><span class=p>,</span><span class=w>
-</span><span class=w>                    </span><span class=p>),</span><span class=w>
-</span><span class=w>                    </span><span class=n>range</span>: <span class=nc>literal</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text_range</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>});</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>ParenExpr</span><span class=p>(</span><span class=n>paren_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>paren_expr</span><span class=p>.</span><span class=n>expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=n>errors</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=n>Expr</span>::<span class=n>UnaryExpr</span><span class=p>(</span><span class=n>unary_expr</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>e</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>unary_expr</span><span class=p>.</span><span class=n>expr</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>validate_expr</span><span class=p>(</span><span class=n>e</span><span class=p>,</span><span class=w> </span><span class=n>errors</span><span class=p>);</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It took a lot of code to walk the entire AST for number literals to validate. It would be easier if we could just search the AST recursively from the top. <code>SyntaxNode</code> has a <code>descendants</code> method that does exactly what we want to do &ndash; all we need is a way to determine whether a given node is a <code>Literal</code> and, if it is, validate it.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>cast</span><span class=p>(</span><span class=n>node</span>: <span class=nc>SyntaxNode</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>node</span><span class=p>.</span><span class=n>kind</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Literal</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=nb>Some</span><span class=p>(</span><span class=n>Self</span><span class=p>(</span><span class=n>node</span><span class=p>))</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=nb>None</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// validation.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>Literal</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>validate</span><span class=p>(</span><span class=n>node</span>: <span class=kp>&amp;</span><span class=nc>SyntaxNode</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ValidationError</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>errors</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>Vec</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>for</span><span class=w> </span><span class=n>node</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>node</span><span class=p>.</span><span class=n>descendants</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>literal</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Literal</span>::<span class=n>cast</span><span class=p>(</span><span class=n>node</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>validate_literal</span><span class=p>(</span><span class=n>literal</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>errors</span><span class=p>)</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>errors</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>validate_literal</span><span class=p>(</span><span class=n>literal</span>: <span class=nc>Literal</span><span class=p>,</span><span class=w> </span><span class=n>errors</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ValidationError</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>literal</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>is_none</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>errors</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>message</span>: <span class=nc>format</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;number literal is larger than an integer’s maximum value, {}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=kt>u64</span>::<span class=n>MAX</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=n>range</span>: <span class=nc>literal</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text_range</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>So much simpler! Let’s write some tests to make sure this is working as expected:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+pub mod validation;
+</code></pre><p>We’ll traverse down into expressions across the entire AST, validating them as we go:</p><pre><code class=language-rust>// crates/ast/src/validation.rs
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
-<span class=nx>text-size</span> <span class=p>=</span> <span class=s2>&#34;1.1.0&#34;</span>
+use crate::{Root, Stmt};
 
-<span class=p>[</span><span class=nx>dev-dependencies</span><span class=p>]</span>
-<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
-</code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>ops</span>::<span class=n>Range</span><span class=w> </span><span class=k>as</span><span class=w> </span><span class=n>StdRange</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_errors</span>: <span class=kp>&amp;</span><span class=p>[(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>StdRange</span><span class=o>&lt;</span><span class=kt>u32</span><span class=o>&gt;</span><span class=p>)])</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span>::<span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>expected_errors</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>expected_errors</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>iter</span><span class=p>()</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>message</span><span class=p>,</span><span class=w> </span><span class=n>range</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>message</span>: <span class=nc>message</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>range</span>: <span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=kd>let</span><span class=w> </span><span class=n>start</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>range</span><span class=p>.</span><span class=n>start</span><span class=p>.</span><span class=n>into</span><span class=p>();</span><span class=w>
-</span><span class=w>                    </span><span class=kd>let</span><span class=w> </span><span class=n>end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>range</span><span class=p>.</span><span class=n>end</span><span class=p>.</span><span class=n>into</span><span class=p>();</span><span class=w>
-</span><span class=w>                    </span><span class=n>TextRange</span>::<span class=n>new</span><span class=p>(</span><span class=n>start</span><span class=p>,</span><span class=w> </span><span class=n>end</span><span class=p>)</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>})</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>collect</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>validate</span><span class=p>(</span><span class=o>&amp;</span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>()),</span><span class=w> </span><span class=n>expected_errors</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>validate_ok_literal</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=s>&#34;123&#34;</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=p>[]);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>validate_too_large_literal</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;99999999999999999999&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=o>&amp;</span><span class=p>[(</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;number literal is larger than an integer’s maximum value, 18446744073709551615&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=p>(</span><span class=mi>0</span><span class=p>..</span><span class=mi>20</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=p>)],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q -p ast --lib
+pub fn validate(root: Root) {
+    for stmt in root.stmts() {
+        match stmt {
+            Stmt::VariableDef(variable_def) =&gt; {
+                if let Some(e) = variable_def.value() {
+                    validate_expr(e)
+                }
+            }
+            Stmt::Expr(e) =&gt; validate_expr(e),
+        }
+    }
+}
+</code></pre><p>Let’s define <code>validate_expr</code>:</p><pre><code class=language-rust>use crate::{Expr, Root, Stmt};
+
+// snip
+
+fn validate_expr(expr: Expr) {
+    match expr {
+        Expr::BinaryExpr(binary_expr) =&gt; {
+            if let Some(e) = binary_expr.lhs() {
+                validate_expr(e);
+            }
+
+            if let Some(e) = binary_expr.rhs() {
+                validate_expr(e);
+            }
+        }
+        Expr::Literal(literal) =&gt; {
+            ???
+        }
+        Expr::ParenExpr(paren_expr) =&gt; {
+            if let Some(e) = paren_expr.expr() {
+                validate_expr(e);
+            }
+        }
+        Expr::UnaryExpr(unary_expr) =&gt; {
+            if let Some(e) = unary_expr.expr() {
+                validate_expr(e);
+            }
+        }
+        Expr::VariableRef(_) =&gt; {}
+    }
+}
+</code></pre><p>How can we actually check if a number literal is greater than <code>u64::MAX</code>? We can’t parse the number and then check, because we would then run into the bug we’re trying to fix! Instead, we’ll report an error when parsing the number fails, since we know the only reason parsing can fail is if the number literal is too large:</p><pre><code class=language-rust>fn validate_expr(expr: Expr) {
+    match expr {
+        // snip
+        Expr::Literal(literal) =&gt; {
+            if literal.parse().is_none() {
+                // report error
+            }
+        }
+        // snip
+    }
+}
+</code></pre><p>This forces us to make that other change from earlier:</p><pre><code class=language-rust>// lib.rs
+
+impl Literal {
+    pub fn parse(&amp;self) -&gt; Option&lt;u64&gt; {
+        self.0.first_token().unwrap().text().parse().ok()
+    }
+}
+</code></pre><p>Let’s update the HIR to store an <code>Option&lt;u64></code> so that analysis can continue in spite of the invalid number literal:</p><pre><code class=language-rust>// crates/hir/src/lib.rs
+
+#[derive(Debug, PartialEq)]
+pub enum Expr {
+    // snip
+    Literal {
+        /// is `None` if the number is too big to fit in a u64
+        n: Option&lt;u64&gt;,
+    },
+    // snip
+}
+</code></pre><p>Unfortunately, we have a number of errors from the lowering tests depending on <code>n</code> being a <code>u64</code>. The errors are straightforward and just involve wrapping numbers in <code>Some()</code>, so I won’t show how to solve them here. Take a look at the <a href=https://github.com/arzg/eldiro/commit/4ade2fd7f12135d94feffaefc490d7e1c67e0b64>diff on GitHub</a> if you get stuck.</p><p>We need a new type to represent validation errors:</p><pre><code class=language-rust>// crates/ast/src/validation.rs
+
+use crate::{Expr, Root, Stmt};
+use text_size::TextRange;
+
+#[derive(Debug, PartialEq)]
+pub struct ValidationError {
+    message: String,
+    range: TextRange,
+}
+</code></pre><pre><code class=language-toml># Cargo.toml
+
+[dependencies]
+syntax = {path = &quot;../syntax&quot;}
+text-size = &quot;1.1.0&quot;
+</code></pre><p>Let’s store a <code>Vec</code> of these, pushing to it as we go:</p><pre><code class=language-rust>// validation.rs
+
+pub fn validate(root: Root) -&gt; Vec&lt;ValidationError&gt; {
+    let mut errors = Vec::new();
+
+    for stmt in root.stmts() {
+        match stmt {
+            Stmt::VariableDef(variable_def) =&gt; {
+                if let Some(e) = variable_def.value() {
+                    validate_expr(e, &amp;mut errors);
+                }
+            }
+            Stmt::Expr(e) =&gt; validate_expr(e, &amp;mut errors),
+        }
+    }
+
+    errors
+}
+
+fn validate_expr(expr: Expr, errors: &amp;mut Vec&lt;ValidationError&gt;) {
+    match expr {
+        Expr::BinaryExpr(binary_expr) =&gt; {
+            if let Some(e) = binary_expr.lhs() {
+                validate_expr(e, errors);
+            }
+
+            if let Some(e) = binary_expr.rhs() {
+                validate_expr(e, errors);
+            }
+        }
+        Expr::Literal(literal) =&gt; {
+            if literal.parse().is_none() {
+                errors.push(ValidationError {
+                    message: format!(
+                        &quot;number literal is larger than an integer’s maximum value, {}&quot;,
+                        u64::MAX,
+                    ),
+                    range: literal.0.first_token().unwrap().text_range(),
+                });
+            }
+        }
+        Expr::ParenExpr(paren_expr) =&gt; {
+            if let Some(e) = paren_expr.expr() {
+                validate_expr(e, errors);
+            }
+        }
+        Expr::UnaryExpr(unary_expr) =&gt; {
+            if let Some(e) = unary_expr.expr() {
+                validate_expr(e, errors);
+            }
+        }
+        // snip
+    }
+}
+</code></pre><p>It took a lot of code to walk the entire AST for number literals to validate. It would be easier if we could just search the AST recursively from the top. <code>SyntaxNode</code> has a <code>descendants</code> method that does exactly what we want to do &ndash; all we need is a way to determine whether a given node is a <code>Literal</code> and, if it is, validate it.</p><pre><code class=language-rust>// lib.rs
+
+impl Literal {
+    pub fn cast(node: SyntaxNode) -&gt; Option&lt;Self&gt; {
+        if node.kind() == SyntaxKind::Literal {
+            Some(Self(node))
+        } else {
+            None
+        }
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-rust>// validation.rs
+
+use crate::Literal;
+use syntax::SyntaxNode;
+use text_size::TextRange;
+
+// snip
+
+pub fn validate(node: &amp;SyntaxNode) -&gt; Vec&lt;ValidationError&gt; {
+    let mut errors = Vec::new();
+
+    for node in node.descendants() {
+        if let Some(literal) = Literal::cast(node) {
+            validate_literal(literal, &amp;mut errors)
+        }
+    }
+
+    errors
+}
+
+fn validate_literal(literal: Literal, errors: &amp;mut Vec&lt;ValidationError&gt;) {
+    if literal.parse().is_none() {
+        errors.push(ValidationError {
+            message: format!(
+                &quot;number literal is larger than an integer’s maximum value, {}&quot;,
+                u64::MAX,
+            ),
+            range: literal.0.first_token().unwrap().text_range(),
+        });
+    }
+}
+</code></pre><p>So much simpler! Let’s write some tests to make sure this is working as expected:<sup id=fnref:1><a href=#fn:1 class=footnote-ref role=doc-noteref>1</a></sup></p><pre><code class=language-toml># Cargo.toml
+
+[dependencies]
+syntax = {path = &quot;../syntax&quot;}
+text-size = &quot;1.1.0&quot;
+
+[dev-dependencies]
+parser = {path = &quot;../parser&quot;}
+</code></pre><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::ops::Range as StdRange;
+
+    fn check(input: &amp;str, expected_errors: &amp;[(&amp;str, StdRange&lt;u32&gt;)]) {
+        let parse = parser::parse(input);
+
+        let expected_errors: Vec&lt;_&gt; = expected_errors
+            .iter()
+            .map(|(message, range)| ValidationError {
+                message: message.to_string(),
+                range: {
+                    let start = range.start.into();
+                    let end = range.end.into();
+                    TextRange::new(start, end)
+                },
+            })
+            .collect();
+
+        assert_eq!(validate(&amp;parse.syntax()), expected_errors);
+    }
+
+    #[test]
+    fn validate_ok_literal() {
+        check(&quot;123&quot;, &amp;[]);
+    }
+
+    #[test]
+    fn validate_too_large_literal() {
+        check(
+            &quot;99999999999999999999&quot;,
+            &amp;[(
+                &quot;number literal is larger than an integer’s maximum value, 18446744073709551615&quot;,
+                (0..20),
+            )],
+        );
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q -p ast --lib
 
 running 2 tests
 ..
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>The tests have revealed a problem with our design, though &ndash; if we ever decide to change the wording of an error message, we have to update all the tests, too. I think that we shouldn’t test the specific text of the error message, but just that an error that <em>signifies</em> that a number literal is too large has been reported. We can represent this in code using an enum with a <code>Display</code> implementation:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>Literal</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>fmt</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>text_size</span>::<span class=n>TextRange</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>kind</span>: <span class=nc>ValidationErrorKind</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>range</span>: <span class=nc>TextRange</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Clone, Copy, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>enum</span> <span class=nc>ValidationErrorKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>NumberLiteralTooLarge</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ValidationErrorKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>fmt</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>f</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Formatter</span><span class=o>&lt;</span><span class=na>&#39;_</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>fmt</span>::<span class=nb>Result</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=bp>self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>NumberLiteralTooLarge</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=n>f</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;number literal is larger than an integer’s maximum value, {}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=kt>u64</span>::<span class=n>MAX</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>validate_literal</span><span class=p>(</span><span class=n>literal</span>: <span class=nc>Literal</span><span class=p>,</span><span class=w> </span><span class=n>errors</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>ValidationError</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>literal</span><span class=p>.</span><span class=n>parse</span><span class=p>().</span><span class=n>is_none</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>errors</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span>: <span class=nc>ValidationErrorKind</span>::<span class=n>NumberLiteralTooLarge</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>range</span>: <span class=nc>literal</span><span class=p>.</span><span class=mf>0.</span><span class=n>first_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>().</span><span class=n>text_range</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s update the tests:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_errors</span>: <span class=kp>&amp;</span><span class=p>[(</span><span class=n>ValidationErrorKind</span><span class=p>,</span><span class=w> </span><span class=n>StdRange</span><span class=o>&lt;</span><span class=kt>u32</span><span class=o>&gt;</span><span class=p>)])</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>expected_errors</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>expected_errors</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>iter</span><span class=p>()</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>range</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>kind</span>: <span class=o>*</span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>range</span>: <span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>})</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>collect</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>validate_too_large_literal</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;99999999999999999999&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=o>&amp;</span><span class=p>[(</span><span class=n>ValidationErrorKind</span>::<span class=n>NumberLiteralTooLarge</span><span class=p>,</span><span class=w> </span><span class=p>(</span><span class=mi>0</span><span class=p>..</span><span class=mi>20</span><span class=p>))],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>For the error type we’ve created to be useful, we need to be able to display it to the user. Let’s implement <code>Display</code> for <code>ValidationError</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Display</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>ValidationError</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>fmt</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>f</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>fmt</span>::<span class=n>Formatter</span><span class=o>&lt;</span><span class=na>&#39;_</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>fmt</span>::<span class=nb>Result</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>f</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;error at {}..{}: {}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=kt>u32</span>::<span class=n>from</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>range</span><span class=p>.</span><span class=n>start</span><span class=p>()),</span><span class=w>
-</span><span class=w>            </span><span class=kt>u32</span>::<span class=n>from</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>range</span><span class=p>.</span><span class=n>end</span><span class=p>()),</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can try this out in the REPL:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro/src/main.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>println</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>syntax</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>error</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>ast</span>::<span class=n>validation</span>::<span class=n>validate</span><span class=p>(</span><span class=o>&amp;</span><span class=n>syntax</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>println</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>error</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>syntax</span><span class=p>).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo r -q
+</code></pre><p>The tests have revealed a problem with our design, though &ndash; if we ever decide to change the wording of an error message, we have to update all the tests, too. I think that we shouldn’t test the specific text of the error message, but just that an error that <em>signifies</em> that a number literal is too large has been reported. We can represent this in code using an enum with a <code>Display</code> implementation:</p><pre><code class=language-rust>use crate::Literal;
+use std::fmt;
+use syntax::SyntaxNode;
+use text_size::TextRange;
+
+#[derive(Debug, PartialEq)]
+pub struct ValidationError {
+    kind: ValidationErrorKind,
+    range: TextRange,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ValidationErrorKind {
+    NumberLiteralTooLarge,
+}
+
+impl fmt::Display for ValidationErrorKind {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;'_&gt;) -&gt; fmt::Result {
+        match self {
+            Self::NumberLiteralTooLarge =&gt; write!(
+                f,
+                &quot;number literal is larger than an integer’s maximum value, {}&quot;,
+                u64::MAX,
+            ),
+        }
+    }
+}
+
+// snip
+
+fn validate_literal(literal: Literal, errors: &amp;mut Vec&lt;ValidationError&gt;) {
+    if literal.parse().is_none() {
+        errors.push(ValidationError {
+            kind: ValidationErrorKind::NumberLiteralTooLarge,
+            range: literal.0.first_token().unwrap().text_range(),
+        });
+    }
+}
+</code></pre><p>Let’s update the tests:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    fn check(input: &amp;str, expected_errors: &amp;[(ValidationErrorKind, StdRange&lt;u32&gt;)]) {
+        // snip
+
+        let expected_errors: Vec&lt;_&gt; = expected_errors
+            .iter()
+            .map(|(kind, range)| ValidationError {
+                kind: *kind,
+                range: {
+                    // snip
+                },
+            })
+            .collect();
+
+        // snip
+    }
+
+    // snip
+
+    #[test]
+    fn validate_too_large_literal() {
+        check(
+            &quot;99999999999999999999&quot;,
+            &amp;[(ValidationErrorKind::NumberLiteralTooLarge, (0..20))],
+        );
+    }
+}
+</code></pre><p>For the error type we’ve created to be useful, we need to be able to display it to the user. Let’s implement <code>Display</code> for <code>ValidationError</code>:</p><pre><code class=language-rust>impl fmt::Display for ValidationError {
+    fn fmt(&amp;self, f: &amp;mut fmt::Formatter&lt;'_&gt;) -&gt; fmt::Result {
+        write!(
+            f,
+            &quot;error at {}..{}: {}&quot;,
+            u32::from(self.range.start()),
+            u32::from(self.range.end()),
+            self.kind,
+        )
+    }
+}
+</code></pre><p>We can try this out in the REPL:</p><pre><code class=language-rust>// crates/eldiro/src/main.rs
+
+fn main() -&gt; io::Result&lt;()&gt; {
+    // snip
+
+    loop {
+        // snip
+
+        let parse = parse(&amp;input);
+        println!(&quot;{}&quot;, parse.debug_tree());
+
+        let syntax = parse.syntax();
+
+        for error in ast::validation::validate(&amp;syntax) {
+            println!(&quot;{}&quot;, error);
+        }
+
+        let root = ast::Root::cast(syntax).unwrap();
+
+        // snip
+    }
+}
+</code></pre><pre><code class=language-->$ cargo r -q
 → 123
 Root@0..4
   Literal@0..4
@@ -844,34 +846,34 @@ Root@0..28
     Whitespace@27..28 &quot;\n&quot;
 error at 0..27: number literal is larger than an integer’s maximum value, 18446744073709551615
 # snip
-</code></pre><h1 id=continuing-with-fuzzing>Continuing with fuzzing</h1><p>I’d argue that most bugs in programming language implementations are in edge-cases that differ slightly from real programs. Currently, the fuzzer is just throwing random input at the parser, hoping to find a bug. We can be more strategic by giving the fuzzer an example to work with &ndash; the fuzzer will modify and mutate this example randomly, rather than starting from total randomness.</p><p>Let’s clear out the existing <em>corpus</em> &ndash; inputs the fuzzer has tried and will work from in future:</p><pre tabindex=0><code class=language-- data-lang=->$ rm fuzz/corpus/parse_lower/*
-</code></pre><p>We’ll add a single example file to the corpus:</p><pre tabindex=0><code># fuzz/corpus/parse_lower/example
+</code></pre><h1 id=continuing-with-fuzzing>Continuing with fuzzing</h1><p>I’d argue that most bugs in programming language implementations are in edge-cases that differ slightly from real programs. Currently, the fuzzer is just throwing random input at the parser, hoping to find a bug. We can be more strategic by giving the fuzzer an example to work with &ndash; the fuzzer will modify and mutate this example randomly, rather than starting from total randomness.</p><p>Let’s clear out the existing <em>corpus</em> &ndash; inputs the fuzzer has tried and will work from in future:</p><pre><code class=language-->$ rm fuzz/corpus/parse_lower/*
+</code></pre><p>We’ll add a single example file to the corpus:</p><pre><code># fuzz/corpus/parse_lower/example
 
 let foo = 10
 let bar = 20
 let a = foo + (bar * bar - (100 / 33))
 
 a * (a - 10) # the result
-</code></pre><p>This includes every bit of syntax we currently support. Let’s run the fuzzer to see what it finds:</p><pre tabindex=0><code class=language-- data-lang=->$ cd fuzz
+</code></pre><p>This includes every bit of syntax we currently support. Let’s run the fuzzer to see what it finds:</p><pre><code class=language-->$ cd fuzz
 $ cargo fuzz run parse_lower
-</code></pre><p>I let this run for a few minutes and didn’t find anything (I know you’re meant to let fuzzers run for several hours so they can exhaust every possible codepath, but I can’t be bothered), so I decided it was time to add AST validation to the fuzz target.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// fuzz/fuzz_targets/parse_lower.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=n>fuzz_target</span><span class=o>!</span><span class=p>(</span><span class=o>|</span><span class=n>data</span>: <span class=kp>&amp;</span><span class=p>[</span><span class=kt>u8</span><span class=p>]</span><span class=o>|</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Ok</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>std</span>::<span class=kt>str</span>::<span class=n>from_utf8</span><span class=p>(</span><span class=n>data</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span>::<span class=n>parse</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>syntax</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>syntax</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>_validation_errors</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>validation</span>::<span class=n>validate</span><span class=p>(</span><span class=o>&amp;</span><span class=n>syntax</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>root</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>ast</span>::<span class=n>Root</span>::<span class=n>cast</span><span class=p>(</span><span class=n>syntax</span><span class=p>).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>_database</span><span class=p>,</span><span class=w> </span><span class=n>_stmts</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>hir</span>::<span class=n>lower</span><span class=p>(</span><span class=n>root</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>});</span><span class=w>
-</span></code></pre></div><p><code>parse_lower</code> isn’t a good name for this fuzz target anymore, as it covers more than just parsing and lowering &ndash; let’s rename it to <code>main</code>, because that seems like a good name for the only fuzz target.</p><pre tabindex=0><code class=language-- data-lang=->$ mv fuzz/fuzz_targets/{parse_lower.rs,main.rs}
+</code></pre><p>I let this run for a few minutes and didn’t find anything (I know you’re meant to let fuzzers run for several hours so they can exhaust every possible codepath, but I can’t be bothered), so I decided it was time to add AST validation to the fuzz target.</p><pre><code class=language-rust>// fuzz/fuzz_targets/parse_lower.rs
+
+fuzz_target!(|data: &amp;[u8]| {
+    if let Ok(s) = std::str::from_utf8(data) {
+        let parse = parser::parse(s);
+        let syntax = parse.syntax();
+        let _validation_errors = ast::validation::validate(&amp;syntax);
+        let root = ast::Root::cast(syntax).unwrap();
+        let (_database, _stmts) = hir::lower(root);
+    }
+});
+</code></pre><p><code>parse_lower</code> isn’t a good name for this fuzz target anymore, as it covers more than just parsing and lowering &ndash; let’s rename it to <code>main</code>, because that seems like a good name for the only fuzz target.</p><pre><code class=language-->$ mv fuzz/fuzz_targets/{parse_lower.rs,main.rs}
 $ mkdir fuzz/corpus/main
 $ mv fuzz/corpus/{parse_lower,main}/example
 $ rm -r fuzz/corpus/parse_lower
-</code></pre><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># Cargo.toml</span>
+</code></pre><pre><code class=language-toml># Cargo.toml
 
-<span class=p>[[</span><span class=nx>bin</span><span class=p>]]</span>
-<span class=nx>name</span> <span class=p>=</span> <span class=s2>&#34;main&#34;</span>
-<span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;fuzz_targets/main.rs&#34;</span>
-</code></pre></div><p>We can now run our fuzz target with <code>cd fuzz && cargo fuzz run main</code>. Again, this didn’t find anything within the first few minutes for me.</p><h1 id=conclusion>Conclusion</h1><p>Thank you for reading! In the next part, we’ll implement string literals.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>I really should have done this at the start. This is a nice pattern &ndash; you use a fuzzer to find bugs in your code, you write some unit tests to catch the bugs the fuzzer found, and then write code to make the bugs go away.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/19/>Part Nineteen: Code Representations</a></div><div style=clear:both></div></nav></body></html>
+[[bin]]
+name = &quot;main&quot;
+path = &quot;fuzz_targets/main.rs&quot;
+</code></pre><p>We can now run our fuzz target with <code>cd fuzz && cargo fuzz run main</code>. Again, this didn’t find anything within the first few minutes for me.</p><h1 id=conclusion>Conclusion</h1><p>Thank you for reading! In the next part, we’ll implement string literals.</p><section class=footnotes role=doc-endnotes><hr><ol><li id=fn:1 role=doc-endnote><p>I really should have done this at the start. This is a nice pattern &ndash; you use a fuzzer to find bugs in your code, you write some unit tests to catch the bugs the fuzzer found, and then write code to make the bugs go away.&#160;<a href=#fnref:1 class=footnote-backref role=doc-backlink>&#8617;&#xfe0e;</a></p></li></ol></section></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/19/>Part Nineteen: Code Representations</a></div><div style=clear:both></div></nav></body></html>

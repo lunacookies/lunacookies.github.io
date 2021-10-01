@@ -1,219 +1,221 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Sixteen: Refactoring · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.b763c3746f235d1e84e23bc1b3d94a46534216d5bbae8ce5b8ae93e8c0816df3.css integrity="sha256-t2PDdG8jXR6E4jvBs9lKRlNCFtW7rozluK6T6MCBbfM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Sixteen: Refactoring · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.04c23afe51262a10ee61829da41f4d7318ff311ed0d0bcbf1db0fde96e3830f4.css integrity="sha256-BMI6/lEmKhDuYYKdpB9Ncxj/MR7Q0Ly/HbD96W44MPQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Sixteen: Refactoring</h1><section class=page-info><ul><li>17 December 2020</li><li>679 words</li><li>three minute read</li></ul></section></header><main><h1 id=refactoring-expr_binding_power>Refactoring <code>expr_binding_power</code></h1><p>The right-hand side of the <code>let lhs = ...</code> in <code>expr_binding_power</code> is getting quite long, so let’s extract it to its own function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>lhs</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>return</span><span class=p>;</span><span class=w> </span><span class=c1>// we’ll handle errors later.
-</span><span class=c1></span><span class=w>    </span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>lhs</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>cm</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=c1>// all the other arms are also here, unchanged
-</span><span class=c1></span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=w> </span><span class=nb>None</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>cm</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+<script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Sixteen: Refactoring</h1><section class=page-info><ul><li>17 December 2020</li><li>976 words</li><li>five minute read</li></ul></section></header><main><h1 id=refactoring-expr_binding_power>Refactoring <code>expr_binding_power</code></h1><p>The right-hand side of the <code>let lhs = ...</code> in <code>expr_binding_power</code> is getting quite long, so let’s extract it to its own function:</p><pre><code class=language-rust>// expr.rs
+
+use super::marker::CompletedMarker;
+use super::Parser;
+use crate::lexer::SyntaxKind;
+
+// snip
+
+fn expr_binding_power(p: &amp;mut Parser, minimum_binding_power: u8) {
+    let mut lhs = if let Some(lhs) = lhs(p) {
+        lhs
+    } else {
+        return; // we’ll handle errors later.
+    };
+
+    // snip
+}
+
+fn lhs(p: &amp;mut Parser) -&gt; Option&lt;CompletedMarker&gt; {
+    let cm = match p.peek() {
+        Some(SyntaxKind::Number) =&gt; {
+            // snip
+        }
+        // all the other arms are also here, unchanged
+        _ =&gt; return None,
+    };
+
+    Some(cm)
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 35 tests
 ...................................
 test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s also extract the parsers for each of the <code>match</code> arms in <code>lhs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>fn</span> <span class=nf>lhs</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>cm</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>literal</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>variable_ref</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>prefix_expr</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>paren_expr</span><span class=p>(</span><span class=n>p</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=w> </span><span class=nb>None</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>cm</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>literal</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Literal</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>variable_ref</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>VariableRef</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>prefix_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>PrefixOp</span>::<span class=n>Neg</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>((),</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>op</span><span class=p>.</span><span class=n>binding_power</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// Eat the operator’s token.
-</span><span class=c1></span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>right_binding_power</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>PrefixExpr</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>paren_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=mi>0</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>RParen</span><span class=p>));</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>ParenExpr</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Writing out that <code>assert_eq!</code> at the start of each subparser is getting annoying. Let’s write a helper method on <code>Parser</code> to make this easier:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>at</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span> <span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>kind</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now update all those <code>assert_eq!</code>s:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>literal</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Number</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>variable_ref</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Ident</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>prefix_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Minus</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>paren_expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>LParen</span><span class=p>));</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=n>assert</span><span class=o>!</span><span class=p>(</span><span class=n>p</span><span class=p>.</span><span class=n>at</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>RParen</span><span class=p>));</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Let’s also extract the parsers for each of the <code>match</code> arms in <code>lhs</code>:</p><pre><code class=language-rust>fn lhs(p: &amp;mut Parser) -&gt; Option&lt;CompletedMarker&gt; {
+    let cm = match p.peek() {
+        Some(SyntaxKind::Number) =&gt; literal(p),
+        Some(SyntaxKind::Ident) =&gt; variable_ref(p),
+        Some(SyntaxKind::Minus) =&gt; prefix_expr(p),
+        Some(SyntaxKind::LParen) =&gt; paren_expr(p),
+        _ =&gt; return None,
+    };
+
+    Some(cm)
+}
+
+// snip
+
+fn literal(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert_eq!(p.peek(), Some(SyntaxKind::Number));
+
+    let m = p.start();
+    p.bump();
+    m.complete(p, SyntaxKind::Literal)
+}
+
+fn variable_ref(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert_eq!(p.peek(), Some(SyntaxKind::Ident));
+
+    let m = p.start();
+    p.bump();
+    m.complete(p, SyntaxKind::VariableRef)
+}
+
+fn prefix_expr(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert_eq!(p.peek(), Some(SyntaxKind::Minus));
+
+    let m = p.start();
+
+    let op = PrefixOp::Neg;
+    let ((), right_binding_power) = op.binding_power();
+
+    // Eat the operator’s token.
+    p.bump();
+
+    expr_binding_power(p, right_binding_power);
+
+    m.complete(p, SyntaxKind::PrefixExpr)
+}
+
+fn paren_expr(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert_eq!(p.peek(), Some(SyntaxKind::LParen));
+
+    let m = p.start();
+
+    p.bump();
+    expr_binding_power(p, 0);
+
+    assert_eq!(p.peek(), Some(SyntaxKind::RParen));
+    p.bump();
+
+    m.complete(p, SyntaxKind::ParenExpr)
+}
+</code></pre><p>Writing out that <code>assert_eq!</code> at the start of each subparser is getting annoying. Let’s write a helper method on <code>Parser</code> to make this easier:</p><pre><code class=language-rust>// parser.rs
+
+impl&lt;'l, 'input&gt; Parser&lt;'l, 'input&gt; {
+    // snip
+
+    fn at(&amp;mut self, kind: SyntaxKind) -&gt; bool {
+        self.peek() == Some(kind)
+    }
+
+    // snip
+}
+</code></pre><p>We can now update all those <code>assert_eq!</code>s:</p><pre><code class=language-rust>// expr.rs
+
+fn literal(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert!(p.at(SyntaxKind::Number));
+
+    // snip
+}
+
+fn variable_ref(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert!(p.at(SyntaxKind::Ident));
+
+    // snip
+}
+
+fn prefix_expr(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert!(p.at(SyntaxKind::Minus));
+
+    // snip
+}
+
+fn paren_expr(p: &amp;mut Parser) -&gt; CompletedMarker {
+    assert!(p.at(SyntaxKind::LParen));
+
+    // snip
+
+    assert!(p.at(SyntaxKind::RParen));
+    p.bump();
+
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 35 tests
 ...................................
 test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=lexeme-versus-token>‘Lexeme’ versus ‘token’</h1><p>I was under the impression that a ‘token’ is an identifier of a given chunk of the input (in our case a <code>SyntaxKind</code>), and that a ‘lexeme’ is a token plus the text that token applies to. Once again it seems that my assumptions about terminology are incorrect: although <a href=https://stackoverflow.com/a/14958865>this StackOverflow answer</a> agrees with my definition of ‘token’, it explains that the word ‘token’ can also be used to describe what I’ve been calling a ‘lexeme’. My definition of ‘lexeme’ is incorrect; the answer says that ‘lexeme’ refers to the text a token applies to, <em>and that only.</em></p><p>Use your editor’s project-wide search and replace to rename <code>Lexeme</code> to <code>Token</code>, <code>lexeme</code> to <code>token</code> and <code>'l</code> to <code>'t</code>. Make sure to run <code>cargo fmt</code> afterwards to maintain formatting.</p><p>See <a href=https://github.com/arzg/eldiro/commit/0d5ba1682698654c27c20139fc7f1ba139d70ad1>the commit</a> where this change is made if you have any trouble.</p><h1 id=removing-unneeded-fields-from-event>Removing unneeded fields from <code>Event</code></h1><p>When we want to add a token to the current branch, we use this event:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span>::<span class=n>Foo</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>text</span>: <span class=s>&#34;bar&#34;</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We get the <code>SyntaxKind</code> and text of this token from the source, which stores an array of tokens internally. Once parsing is complete, the sink goes through each event and processes it. The sink also stores the same array of tokens.</p><p>This means that the the parser doesn’t need to tell the sink the <code>SyntaxKind</code> and text of each token it’s adding, since the sink already has the data to work this out. Let’s remove the unnecessary fields from <code>Event::AddToken</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=n>forward_parent</span>: <span class=nb>Option</span><span class=o>&lt;</span><span class=kt>usize</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=n>AddToken</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>FinishNode</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Placeholder</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This has reduced the size of <code>Event</code> from 32 bytes to 24 bytes. Let’s update <code>Parser::bump</code> to match:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>source</span><span class=p>.</span><span class=n>next_token</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We also need to change <code>Sink</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>mem</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>idx</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=mi>0</span><span class=p>..</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>mem</span>::<span class=n>replace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>[</span><span class=n>idx</span><span class=p>],</span><span class=w> </span><span class=n>Event</span>::<span class=n>Placeholder</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_trivia</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_trivia</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>token</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=o>!</span><span class=n>token</span><span class=p>.</span><span class=n>kind</span><span class=p>.</span><span class=n>is_trivia</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=k>break</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>token</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Token</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>),</span><span class=w> </span><span class=n>text</span><span class=p>.</span><span class=n>into</span><span class=p>());</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><h1 id=lexeme-versus-token>‘Lexeme’ versus ‘token’</h1><p>I was under the impression that a ‘token’ is an identifier of a given chunk of the input (in our case a <code>SyntaxKind</code>), and that a ‘lexeme’ is a token plus the text that token applies to. Once again it seems that my assumptions about terminology are incorrect: although <a href=https://stackoverflow.com/a/14958865>this StackOverflow answer</a> agrees with my definition of ‘token’, it explains that the word ‘token’ can also be used to describe what I’ve been calling a ‘lexeme’. My definition of ‘lexeme’ is incorrect; the answer says that ‘lexeme’ refers to the text a token applies to, <em>and that only.</em></p><p>Use your editor’s project-wide search and replace to rename <code>Lexeme</code> to <code>Token</code>, <code>lexeme</code> to <code>token</code> and <code>'l</code> to <code>'t</code>. Make sure to run <code>cargo fmt</code> afterwards to maintain formatting.</p><p>See <a href=https://github.com/arzg/eldiro/commit/0d5ba1682698654c27c20139fc7f1ba139d70ad1>the commit</a> where this change is made if you have any trouble.</p><h1 id=removing-unneeded-fields-from-event>Removing unneeded fields from <code>Event</code></h1><p>When we want to add a token to the current branch, we use this event:</p><pre><code class=language-rust>Event::AddToken {
+    kind: SyntaxKind::Foo,
+    text: &quot;bar&quot;.into(),
+}
+</code></pre><p>We get the <code>SyntaxKind</code> and text of this token from the source, which stores an array of tokens internally. Once parsing is complete, the sink goes through each event and processes it. The sink also stores the same array of tokens.</p><p>This means that the the parser doesn’t need to tell the sink the <code>SyntaxKind</code> and text of each token it’s adding, since the sink already has the data to work this out. Let’s remove the unnecessary fields from <code>Event::AddToken</code>:</p><pre><code class=language-rust>// event.rs
+
+use crate::lexer::SyntaxKind;
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum Event {
+    StartNode {
+        kind: SyntaxKind,
+        forward_parent: Option&lt;usize&gt;,
+    },
+    AddToken,
+    FinishNode,
+    Placeholder,
+}
+</code></pre><p>This has reduced the size of <code>Event</code> from 32 bytes to 24 bytes. Let’s update <code>Parser::bump</code> to match:</p><pre><code class=language-rust>// parser.rs
+
+impl&lt;'t, 'input&gt; Parser&lt;'t, 'input&gt; {
+    // snip
+
+    fn bump(&amp;mut self) {
+        self.source.next_token().unwrap();
+        self.events.push(Event::AddToken);
+    }
+
+    // snip
+}
+</code></pre><p>We also need to change <code>Sink</code>:</p><pre><code class=language-rust>// sink.rs
+
+use super::event::Event;
+use crate::lexer::Token;
+use crate::syntax::EldiroLanguage;
+use rowan::{GreenNode, GreenNodeBuilder, Language};
+use std::mem;
+
+// snip
+
+impl&lt;'t, 'input&gt; Sink&lt;'t, 'input&gt; {
+    // snip
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        for idx in 0..self.events.len() {
+            match mem::replace(&amp;mut self.events[idx], Event::Placeholder) {
+                // snip
+                Event::AddToken =&gt; self.token(),
+                // snip
+            }
+
+            self.eat_trivia();
+        }
+
+        self.builder.finish()
+    }
+
+    fn eat_trivia(&amp;mut self) {
+        while let Some(token) = self.tokens.get(self.cursor) {
+            if !token.kind.is_trivia() {
+                break;
+            }
+
+            self.token();
+        }
+    }
+
+    fn token(&amp;mut self) {
+        let Token { kind, text } = self.tokens[self.cursor];
+
+        self.builder
+            .token(EldiroLanguage::kind_to_raw(kind), text.into());
+
+        self.cursor += 1;
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 35 tests
 ...................................
 test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

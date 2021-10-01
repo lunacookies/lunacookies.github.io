@@ -1,60 +1,62 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Nine: Function Calls · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.b763c3746f235d1e84e23bc1b3d94a46534216d5bbae8ce5b8ae93e8c0816df3.css integrity="sha256-t2PDdG8jXR6E4jvBs9lKRlNCFtW7rozluK6T6MCBbfM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Nine: Function Calls · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.04c23afe51262a10ee61829da41f4d7318ff311ed0d0bcbf1db0fde96e3830f4.css integrity="sha256-BMI6/lEmKhDuYYKdpB9Ncxj/MR7Q0Ly/HbD96W44MPQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Nine: Function Calls</h1><section class=page-info><ul><li>8 November 2020</li><li>3406 words</li><li>17 minute read</li></ul></section></header><main><p>As we did last time, we need to choose a syntax, this time for function calls.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Rust syntax
-</span><span class=c1></span><span class=n>f</span><span class=p>(</span><span class=n>a</span><span class=p>,</span><span class=w> </span><span class=n>b</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>);</span><span class=w>
-</span><span class=w></span><span class=n>no_params</span><span class=p>();</span><span class=w>
-</span></code></pre></div><p>Again, as I said in the previous part, parentheses and commas are annoying. Hence, Eldiro will use a different syntax in the spirit of ML-family languages:</p><pre tabindex=0><code>f a b c
+<script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Nine: Function Calls</h1><section class=page-info><ul><li>8 November 2020</li><li>4465 words</li><li>22 minute read</li></ul></section></header><main><p>As we did last time, we need to choose a syntax, this time for function calls.</p><pre><code class=language-rust>// Rust syntax
+f(a, b, c);
+no_params();
+</code></pre><p>Again, as I said in the previous part, parentheses and commas are annoying. Hence, Eldiro will use a different syntax in the spirit of ML-family languages:</p><pre><code>f a b c
 no_params
-</code></pre><p>Much cleaner! This doesn’t syntactically distinguish between calling a function with no parameters and using a binding, though &ndash; we don’t know during parsing whether <code>no_params</code> is a binding usage, or a function call with no parameters. We can solve this by looking at all the functions and bindings in scope during interpretation of a binding usage &ndash; if there’s a function with the name of the binding usage, we evaluate that with no parameters. If there isn’t, then we fall back to our usual strategy.</p><h1 id=parsing>Parsing</h1><p>We need a new module:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>binding_usage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>block</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>func_call</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Let’s write our first test:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/expr/func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_func_call_with_no_params</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;greet_user&#34;</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>callee</span>: <span class=s>&#34;greet_user&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                    </span><span class=n>params</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We need to define <code>FuncCall</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Expr</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>callee</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>params</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Expr</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We also have to define <code>FuncCall::new</code>. Let’s do the simplest thing that could make the test pass, short of hardcoding the output:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>utils</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>callee</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=nc>callee</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Much cleaner! This doesn’t syntactically distinguish between calling a function with no parameters and using a binding, though &ndash; we don’t know during parsing whether <code>no_params</code> is a binding usage, or a function call with no parameters. We can solve this by looking at all the functions and bindings in scope during interpretation of a binding usage &ndash; if there’s a function with the name of the binding usage, we evaluate that with no parameters. If there isn’t, then we fall back to our usual strategy.</p><h1 id=parsing>Parsing</h1><p>We need a new module:</p><pre><code class=language-rust>// expr.rs
+
+mod binding_usage;
+mod block;
+mod func_call;
+</code></pre><p>Let’s write our first test:</p><pre><code class=language-rust>// src/expr/func_call.rs
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_func_call_with_no_params() {
+        assert_eq!(
+            FuncCall::new(&quot;greet_user&quot;),
+            Ok((
+                &quot;&quot;,
+                FuncCall {
+                    callee: &quot;greet_user&quot;.to_string(),
+                    params: Vec::new(),
+                },
+            )),
+        );
+    }
+}
+</code></pre><p>We need to define <code>FuncCall</code>:</p><pre><code class=language-rust>use super::Expr;
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct FuncCall {
+    pub(crate) callee: String,
+    pub(crate) params: Vec&lt;Expr&gt;,
+}
+</code></pre><p>We also have to define <code>FuncCall::new</code>. Let’s do the simplest thing that could make the test pass, short of hardcoding the output:</p><pre><code class=language-rust>use crate::utils;
+
+// snip
+
+impl FuncCall {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let (s, callee) = utils::extract_ident(s)?;
+
+        Ok((
+            s,
+            Self {
+                callee: callee.to_string(),
+                params: Vec::new(),
+            },
+        ))
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 warning: associated function is never used: `get_func`
   --&gt; crates/eldiro/src/env.rs:33:19
    |
@@ -109,82 +111,82 @@ failures:
     expr::func_call::tests::parse_func_call_with_no_params
 
 test result: FAILED. 52 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Whoa, that’s a lot of warnings! That must be because we haven’t used <code>FuncCall</code> anywhere. A function call is a kind of expression, so we should show that in the code:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>binding_usage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>block</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>func_call</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>binding_usage</span>::<span class=n>BindingUsage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>block</span>::<span class=n>Block</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>func_call</span>::<span class=n>FuncCall</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>),</span><span class=w>
-</span><span class=w>    </span><span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>lhs</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=n>rhs</span>: <span class=nb>Box</span><span class=o>&lt;</span><span class=n>Self</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=n>op</span>: <span class=nc>Op</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=n>FuncCall</span><span class=p>(</span><span class=n>FuncCall</span><span class=p>),</span><span class=w>
-</span><span class=w>    </span><span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=p>),</span><span class=w>
-</span><span class=w>    </span><span class=n>Block</span><span class=p>(</span><span class=n>Block</span><span class=p>),</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>new_non_operation</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span>::<span class=n>new_number</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>or_else</span><span class=p>(</span><span class=o>|</span><span class=n>_</span><span class=o>|</span><span class=w> </span><span class=n>FuncCall</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>).</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>func_call</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>FuncCall</span><span class=p>(</span><span class=n>func_call</span><span class=p>))))</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>or_else</span><span class=p>(</span><span class=o>|</span><span class=n>_</span><span class=o>|</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>BindingUsage</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w>
-</span><span class=w>                    </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>binding_usage</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>binding_usage</span><span class=p>)))</span><span class=w>
-</span><span class=w>            </span><span class=p>})</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>or_else</span><span class=p>(</span><span class=o>|</span><span class=n>_</span><span class=o>|</span><span class=w> </span><span class=n>Block</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>).</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>block</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>Block</span><span class=p>(</span><span class=n>block</span><span class=p>))))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s write a test to make sure that this works:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_func_call</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;add 1 2&#34;</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>Expr</span>::<span class=n>FuncCall</span><span class=p>(</span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>callee</span>: <span class=s>&#34;add&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                    </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>1</span><span class=p>)),</span><span class=w> </span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>2</span><span class=p>))],</span><span class=w>
-</span><span class=w>                </span><span class=p>}),</span><span class=w>
-</span><span class=w>            </span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Our project isn’t compiling, which means we can’t run our tests. We have to add a case to <code>Expr::eval</code> for <code>Expr::FuncCall</code>. For now, we can use the <code>todo!()</code> macro so we can move on:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=bp>self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=n>n</span><span class=p>))</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Val</span>::<span class=n>Number</span><span class=p>(</span><span class=o>*</span><span class=n>n</span><span class=p>)),</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>FuncCall</span><span class=p>(</span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>todo</span><span class=o>!</span><span class=p>(),</span><span class=w> </span><span class=c1>// here
-</span><span class=c1></span><span class=w>            </span><span class=n>Self</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>binding_usage</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>binding_usage</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Block</span><span class=p>(</span><span class=n>block</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>block</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Whoa, that’s a lot of warnings! That must be because we haven’t used <code>FuncCall</code> anywhere. A function call is a kind of expression, so we should show that in the code:</p><pre><code class=language-rust>// expr.rs
+
+mod binding_usage;
+mod block;
+mod func_call;
+
+pub(crate) use binding_usage::BindingUsage;
+pub(crate) use block::Block;
+pub(crate) use func_call::FuncCall;
+
+// snip
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Expr {
+    Number(Number),
+    Operation {
+        lhs: Box&lt;Self&gt;,
+        rhs: Box&lt;Self&gt;,
+        op: Op,
+    },
+    FuncCall(FuncCall),
+    BindingUsage(BindingUsage),
+    Block(Block),
+}
+
+impl Expr {
+    // snip
+
+    fn new_non_operation(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        Self::new_number(s)
+            .or_else(|_| FuncCall::new(s).map(|(s, func_call)| (s, Self::FuncCall(func_call))))
+            .or_else(|_| {
+                BindingUsage::new(s)
+                    .map(|(s, binding_usage)| (s, Self::BindingUsage(binding_usage)))
+            })
+            .or_else(|_| Block::new(s).map(|(s, block)| (s, Self::Block(block))))
+    }
+
+    // snip
+}
+</code></pre><p>Let’s write a test to make sure that this works:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_func_call() {
+        assert_eq!(
+            Expr::new(&quot;add 1 2&quot;),
+            Ok((
+                &quot;&quot;,
+                Expr::FuncCall(FuncCall {
+                    callee: &quot;add&quot;.to_string(),
+                    params: vec![Expr::Number(Number(1)), Expr::Number(Number(2))],
+                }),
+            )),
+        );
+    }
+
+    // snip
+}
+</code></pre><p>Our project isn’t compiling, which means we can’t run our tests. We have to add a case to <code>Expr::eval</code> for <code>Expr::FuncCall</code>. For now, we can use the <code>todo!()</code> macro so we can move on:</p><pre><code class=language-rust>impl Expr {
+    // snip
+
+    pub(crate) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        match self {
+            Self::Number(Number(n)) =&gt; Ok(Val::Number(*n)),
+            Self::Operation { lhs, rhs, op } =&gt; {
+                // snip
+            }
+            Self::FuncCall(_) =&gt; todo!(), // here
+            Self::BindingUsage(binding_usage) =&gt; binding_usage.eval(env),
+            Self::Block(block) =&gt; block.eval(env),
+        }
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 warning: associated function is never used: `get_func`
   --&gt; crates/eldiro/src/env.rs:33:19
    |
@@ -263,44 +265,44 @@ failures:
     stmt::tests::parse_func_def
 
 test result: FAILED. 48 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We have even more problems than before! What’s happened here is that all the binding usages in our tests are now being parsed as function calls with no parameters. Remember how I said earlier that a binding usage and a parameter-less function call are indistinguishable during parsing? That’s what we’re running into here.</p><p>We have two choices: abolish <code>BindingUsage</code> in favour of special-casing the evaluation of function calls with one parameter, or we could alternatively only parse function calls with one or more parameters. The first results in less code but is more work to change, while the second takes more code but is an easy change. Since we’re making this project just to learn at the moment, I’ll go for the easy option: only accepting function calls with one or more parameters.</p><p>We need to update our test first:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=k>super</span>::<span class=n>Number</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_func_call_with_one_parameter</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;factorial 10&#34;</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>callee</span>: <span class=s>&#34;factorial&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                    </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>10</span><span class=p>))],</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We should adjust <code>FuncCall::new</code> so that it extracts one parameter:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>callee</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>param</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Expr</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=nc>callee</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>param</span><span class=p>],</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>We have even more problems than before! What’s happened here is that all the binding usages in our tests are now being parsed as function calls with no parameters. Remember how I said earlier that a binding usage and a parameter-less function call are indistinguishable during parsing? That’s what we’re running into here.</p><p>We have two choices: abolish <code>BindingUsage</code> in favour of special-casing the evaluation of function calls with one parameter, or we could alternatively only parse function calls with one or more parameters. The first results in less code but is more work to change, while the second takes more code but is an easy change. Since we’re making this project just to learn at the moment, I’ll go for the easy option: only accepting function calls with one or more parameters.</p><p>We need to update our test first:</p><pre><code class=language-rust>// func_call.rs
+
+#[cfg(test)]
+mod tests {
+    use super::super::Number;
+    use super::*;
+
+    #[test]
+    fn parse_func_call_with_one_parameter() {
+        assert_eq!(
+            FuncCall::new(&quot;factorial 10&quot;),
+            Ok((
+                &quot;&quot;,
+                FuncCall {
+                    callee: &quot;factorial&quot;.to_string(),
+                    params: vec![Expr::Number(Number(10))],
+                },
+            )),
+        );
+    }
+}
+</code></pre><p>We should adjust <code>FuncCall::new</code> so that it extracts one parameter:</p><pre><code class=language-rust>impl FuncCall {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let (s, callee) = utils::extract_ident(s)?;
+        let (s, _) = utils::extract_whitespace1(s)?;
+
+        let (s, param) = Expr::new(s)?;
+
+        Ok((
+            s,
+            Self {
+                callee: callee.to_string(),
+                params: vec![param],
+            },
+        ))
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 54 tests
 .......................F.....F........................
 failures:
@@ -322,23 +324,23 @@ failures:
     expr::tests::parse_func_call
 
 test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We’ll worry about the first failure later; the second one is from <code>crate::expr::tests::parse_func_call</code>. This test fails because <code>FuncCall::new</code> doesn’t accept function calls with more than one parameter. Let’s use <code>utils::sequence</code> to remedy this:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>callee</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>sequence</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>new</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=nc>callee</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>We’ll worry about the first failure later; the second one is from <code>crate::expr::tests::parse_func_call</code>. This test fails because <code>FuncCall::new</code> doesn’t accept function calls with more than one parameter. Let’s use <code>utils::sequence</code> to remedy this:</p><pre><code class=language-rust>impl FuncCall {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let (s, callee) = utils::extract_ident(s)?;
+        let (s, _) = utils::extract_whitespace1(s)?;
+
+        let (s, params) = utils::sequence(Expr::new, s)?;
+
+        Ok((
+            s,
+            Self {
+                callee: callee.to_string(),
+                params,
+            },
+        ))
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 54 tests
 .......................F............F.................
 failures:
@@ -360,68 +362,68 @@ failures:
     func_def::tests::parse_func_def_with_multiple_params
 
 test result: FAILED. 52 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>That first test from before is still failing, and we did indeed fix <code>crate::expr::tests::parse_func_call</code>. We managed to break function definition parsing, though. Here’s the test in question:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_func_def_with_multiple_params</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncDef</span>::<span class=n>new</span><span class=p>(</span><span class=s>&#34;fn add x y =&gt; x + y&#34;</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;add&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                    </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w> </span><span class=s>&#34;y&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()],</span><span class=w>
-</span><span class=w>                    </span><span class=n>body</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                        </span><span class=n>lhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                            </span><span class=n>name</span>: <span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                        </span><span class=p>})),</span><span class=w>
-</span><span class=w>                        </span><span class=n>rhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                            </span><span class=n>name</span>: <span class=s>&#34;y&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                        </span><span class=p>})),</span><span class=w>
-</span><span class=w>                        </span><span class=n>op</span>: <span class=nc>Op</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
-</span><span class=w>                    </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The <code>x</code> in <code>x + y</code> is being parsed as a function call with no parameters, rather than as a binding usage. Hmm, it must be because <code>utils::sequence</code> accepts sequences of lengths zero. A nice way of solving this is to create a wrapper around <code>sequence</code> that checks if the output is length zero, and, if it is, returns an error. First, though, we should make use of this hypothetical <code>sequence1</code> in <code>FuncCall::new</code> so we know immediately if our implementation is correct:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>callee</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>sequence1</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>new</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=nc>callee</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We can now define <code>sequence1</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence1</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
-</span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>sequence</span><span class=p>(</span><span class=n>parser</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>sequence</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;expected a sequence with more than one item&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>That first test from before is still failing, and we did indeed fix <code>crate::expr::tests::parse_func_call</code>. We managed to break function definition parsing, though. Here’s the test in question:</p><pre><code class=language-rust>// func_def.rs
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_func_def_with_multiple_params() {
+        assert_eq!(
+            FuncDef::new(&quot;fn add x y =&gt; x + y&quot;),
+            Ok((
+                &quot;&quot;,
+                FuncDef {
+                    name: &quot;add&quot;.to_string(),
+                    params: vec![&quot;x&quot;.to_string(), &quot;y&quot;.to_string()],
+                    body: Box::new(Stmt::Expr(Expr::Operation {
+                        lhs: Box::new(Expr::BindingUsage(BindingUsage {
+                            name: &quot;x&quot;.to_string(),
+                        })),
+                        rhs: Box::new(Expr::BindingUsage(BindingUsage {
+                            name: &quot;y&quot;.to_string(),
+                        })),
+                        op: Op::Add,
+                    })),
+                },
+            )),
+        );
+    }
+}
+</code></pre><p>The <code>x</code> in <code>x + y</code> is being parsed as a function call with no parameters, rather than as a binding usage. Hmm, it must be because <code>utils::sequence</code> accepts sequences of lengths zero. A nice way of solving this is to create a wrapper around <code>sequence</code> that checks if the output is length zero, and, if it is, returns an error. First, though, we should make use of this hypothetical <code>sequence1</code> in <code>FuncCall::new</code> so we know immediately if our implementation is correct:</p><pre><code class=language-rust>// func_call.rs
+
+impl FuncCall {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let (s, callee) = utils::extract_ident(s)?;
+        let (s, _) = utils::extract_whitespace1(s)?;
+
+        let (s, params) = utils::sequence1(Expr::new, s)?;
+
+        Ok((
+            s,
+            Self {
+                callee: callee.to_string(),
+                params,
+            },
+        ))
+    }
+}
+</code></pre><p>We can now define <code>sequence1</code>:</p><pre><code class=language-rust>// utils.rs
+
+pub(crate) fn sequence1&lt;T&gt;(
+    parser: impl Fn(&amp;str) -&gt; Result&lt;(&amp;str, T), String&gt;,
+    s: &amp;str,
+) -&gt; Result&lt;(&amp;str, Vec&lt;T&gt;), String&gt; {
+    let (s, sequence) = sequence(parser, s)?;
+
+    if sequence.is_empty() {
+        Err(&quot;expected a sequence with more than one item&quot;.to_string())
+    } else {
+        Ok((s, sequence))
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 54 tests
 ........................F.............................
 failures:
@@ -437,436 +439,436 @@ failures:
     expr::block::tests::parse_block_with_multiple_stmts
 
 test result: FAILED. 53 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Here’s <code>parse_block_with_multiple_stmts</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_block_with_multiple_stmts</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>Block</span>::<span class=n>new</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;{
-</span><span class=s>    let a = 10
-</span><span class=s>    let b = a
-</span><span class=s>    b
-</span><span class=s>}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>stmts</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=w>
-</span><span class=w>                        </span><span class=n>Stmt</span>::<span class=n>BindingDef</span><span class=p>(</span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                            </span><span class=n>name</span>: <span class=s>&#34;a&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                            </span><span class=n>val</span>: <span class=nc>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>10</span><span class=p>)),</span><span class=w>
-</span><span class=w>                        </span><span class=p>}),</span><span class=w>
-</span><span class=w>                        </span><span class=n>Stmt</span>::<span class=n>BindingDef</span><span class=p>(</span><span class=n>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                            </span><span class=n>name</span>: <span class=s>&#34;b&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                            </span><span class=n>val</span>: <span class=nc>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                                </span><span class=n>name</span>: <span class=s>&#34;a&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                            </span><span class=p>}),</span><span class=w>
-</span><span class=w>                        </span><span class=p>}),</span><span class=w>
-</span><span class=w>                        </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                            </span><span class=n>name</span>: <span class=s>&#34;b&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                        </span><span class=p>})),</span><span class=w>
-</span><span class=w>                    </span><span class=p>],</span><span class=w>
-</span><span class=w>                </span><span class=p>},</span><span class=w>
-</span><span class=w>            </span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The</p><pre tabindex=0><code>a
+</code></pre><p>Here’s <code>parse_block_with_multiple_stmts</code>:</p><pre><code class=language-rust>// block.rs
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_block_with_multiple_stmts() {
+        assert_eq!(
+            Block::new(
+                &quot;{
+    let a = 10
+    let b = a
+    b
+}&quot;,
+            ),
+            Ok((
+                &quot;&quot;,
+                Block {
+                    stmts: vec![
+                        Stmt::BindingDef(BindingDef {
+                            name: &quot;a&quot;.to_string(),
+                            val: Expr::Number(Number(10)),
+                        }),
+                        Stmt::BindingDef(BindingDef {
+                            name: &quot;b&quot;.to_string(),
+                            val: Expr::BindingUsage(BindingUsage {
+                                name: &quot;a&quot;.to_string(),
+                            }),
+                        }),
+                        Stmt::Expr(Expr::BindingUsage(BindingUsage {
+                            name: &quot;b&quot;.to_string(),
+                        })),
+                    ],
+                },
+            )),
+        );
+    }
+
+    // snip
+}
+</code></pre><p>The</p><pre><code>a
 b
-</code></pre><p>in</p><pre tabindex=0><code>let b = a
+</code></pre><p>in</p><pre><code>let b = a
 b
-</code></pre><p>is being parsed as a function call, rather than two separate entities (the first of these is the right-hand side of the binding definition, and the other is the final return value of the block). This is happening because <code>utils::sequence</code> (and by extension <code>utils::sequence1</code>) use <code>utils::extract_whitespace</code> internally, which consumes both spaces and newlines. Let’s create a separate <code>utils::extract_non_newline_whitespace</code>, and also allow for a custom separator in <code>utils::sequence</code> and <code>utils::sequence1</code>. That function name is a bit ridiculous though, and it will likely only be used once. Because of this I think it makes more sense to just pass in the function as a one-time closure to <code>utils::sequence1</code> in <code>FuncCall::new</code>.</p><p>Let’s make <code>utils::sequence</code> and <code>utils::sequence1</code> accept a custom separator first:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
-</span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>separator_parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>),</span><span class=w>
-</span><span class=w>    </span><span class=k>mut</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>items</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>Vec</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Ok</span><span class=p>((</span><span class=n>new_s</span><span class=p>,</span><span class=w> </span><span class=n>item</span><span class=p>))</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>new_s</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=n>items</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>item</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>new_s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>separator_parser</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>new_s</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>items</span><span class=p>))</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>sequence1</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>(</span><span class=w>
-</span><span class=w>    </span><span class=n>parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>T</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>separator_parser</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>),</span><span class=w>
-</span><span class=w>    </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=nb>Vec</span><span class=o>&lt;</span><span class=n>T</span><span class=o>&gt;</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>sequence</span><span class=p>(</span><span class=n>parser</span><span class=p>,</span><span class=w> </span><span class=n>separator_parser</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>if</span><span class=w> </span><span class=n>sequence</span><span class=p>.</span><span class=n>is_empty</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;expected a sequence with more than one item&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>())</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>sequence</span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We now need to update all the usages of <code>utils::sequence</code> and <code>utils::sequence1</code> to pass in the separators they use:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// block.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;{&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>stmts</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>sequence</span><span class=p>(</span><span class=n>Stmt</span>::<span class=n>new</span><span class=p>,</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>Block</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>stmts</span><span class=w> </span><span class=p>}))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_def.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;fn&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace1</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>name</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>sequence</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=o>|</span><span class=n>s</span><span class=o>|</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>).</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>ident</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>ident</span><span class=p>.</span><span class=n>to_string</span><span class=p>())),</span><span class=w>
-</span><span class=w>            </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>s</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>tag</span><span class=p>(</span><span class=s>&#34;=&gt;&#34;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_whitespace</span><span class=p>(</span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>body</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Stmt</span>::<span class=n>new</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=nc>name</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>body</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>body</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>And now finally <code>FuncCall::new</code>, where we pass in a closure that accepts <em>only spaces,</em> not newlines. Let’s also adjust the extraction of whitespace after parsing out the callee so that it stays consistent:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>Self</span><span class=p>),</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>callee</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>extract_ident</span><span class=p>(</span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=sc>&#39; &#39;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>s</span><span class=p>,</span><span class=w> </span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>utils</span>::<span class=n>sequence1</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>new</span><span class=p>,</span><span class=w> </span><span class=o>|</span><span class=n>s</span><span class=o>|</span><span class=w> </span><span class=n>utils</span>::<span class=n>take_while</span><span class=p>(</span><span class=o>|</span><span class=n>c</span><span class=o>|</span><span class=w> </span><span class=n>c</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=sc>&#39; &#39;</span><span class=p>,</span><span class=w> </span><span class=n>s</span><span class=p>),</span><span class=w> </span><span class=n>s</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Ok</span><span class=p>((</span><span class=w>
-</span><span class=w>            </span><span class=n>s</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=nc>callee</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>},</span><span class=w>
-</span><span class=w>        </span><span class=p>))</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’re using the same <code>take_while</code> function we used for <code>extract_whitespace</code>. The only thing left is to make <code>take_while</code> <code>pub(crate)</code> so that the <code>crate::expr::func_call</code> module can use it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// utils.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>take_while</span><span class=p>(</span><span class=n>accept</span>: <span class=nc>impl</span><span class=w> </span><span class=nb>Fn</span><span class=p>(</span><span class=n>char</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span><span class=p>,</span><span class=w> </span><span class=n>s</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=p>(</span><span class=o>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted_end</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>s</span><span class=w>
-</span><span class=w>        </span><span class=p>.</span><span class=n>char_indices</span><span class=p>()</span><span class=w>
-</span><span class=w>        </span><span class=p>.</span><span class=n>find_map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>c</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=k>if</span><span class=w> </span><span class=n>accept</span><span class=p>(</span><span class=n>c</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>None</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>idx</span><span class=p>)</span><span class=w> </span><span class=p>})</span><span class=w>
-</span><span class=w>        </span><span class=p>.</span><span class=n>unwrap_or_else</span><span class=p>(</span><span class=o>||</span><span class=w> </span><span class=n>s</span><span class=p>.</span><span class=n>len</span><span class=p>());</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>extracted</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[..</span><span class=n>extracted_end</span><span class=p>];</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>remainder</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=o>&amp;</span><span class=n>s</span><span class=p>[</span><span class=n>extracted_end</span><span class=p>..];</span><span class=w>
-</span><span class=w>    </span><span class=p>(</span><span class=n>remainder</span><span class=p>,</span><span class=w> </span><span class=n>extracted</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>is being parsed as a function call, rather than two separate entities (the first of these is the right-hand side of the binding definition, and the other is the final return value of the block). This is happening because <code>utils::sequence</code> (and by extension <code>utils::sequence1</code>) use <code>utils::extract_whitespace</code> internally, which consumes both spaces and newlines. Let’s create a separate <code>utils::extract_non_newline_whitespace</code>, and also allow for a custom separator in <code>utils::sequence</code> and <code>utils::sequence1</code>. That function name is a bit ridiculous though, and it will likely only be used once. Because of this I think it makes more sense to just pass in the function as a one-time closure to <code>utils::sequence1</code> in <code>FuncCall::new</code>.</p><p>Let’s make <code>utils::sequence</code> and <code>utils::sequence1</code> accept a custom separator first:</p><pre><code class=language-rust>// utils.rs
+
+pub(crate) fn sequence&lt;T&gt;(
+    parser: impl Fn(&amp;str) -&gt; Result&lt;(&amp;str, T), String&gt;,
+    separator_parser: impl Fn(&amp;str) -&gt; (&amp;str, &amp;str),
+    mut s: &amp;str,
+) -&gt; Result&lt;(&amp;str, Vec&lt;T&gt;), String&gt; {
+    let mut items = Vec::new();
+
+    while let Ok((new_s, item)) = parser(s) {
+        s = new_s;
+        items.push(item);
+
+        let (new_s, _) = separator_parser(s);
+        s = new_s;
+    }
+
+    Ok((s, items))
+}
+
+pub(crate) fn sequence1&lt;T&gt;(
+    parser: impl Fn(&amp;str) -&gt; Result&lt;(&amp;str, T), String&gt;,
+    separator_parser: impl Fn(&amp;str) -&gt; (&amp;str, &amp;str),
+    s: &amp;str,
+) -&gt; Result&lt;(&amp;str, Vec&lt;T&gt;), String&gt; {
+    let (s, sequence) = sequence(parser, separator_parser, s)?;
+
+    if sequence.is_empty() {
+        Err(&quot;expected a sequence with more than one item&quot;.to_string())
+    } else {
+        Ok((s, sequence))
+    }
+}
+</code></pre><p>We now need to update all the usages of <code>utils::sequence</code> and <code>utils::sequence1</code> to pass in the separators they use:</p><pre><code class=language-rust>// block.rs
+
+impl Block {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let s = utils::tag(&quot;{&quot;, s)?;
+        let (s, _) = utils::extract_whitespace(s);
+
+        let (s, stmts) = utils::sequence(Stmt::new, utils::extract_whitespace, s)?;
+
+        let (s, _) = utils::extract_whitespace(s);
+        let s = utils::tag(&quot;}&quot;, s)?;
+
+        Ok((s, Block { stmts }))
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-rust>// func_def.rs
+
+impl FuncDef {
+    pub(crate) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let s = utils::tag(&quot;fn&quot;, s)?;
+        let (s, _) = utils::extract_whitespace1(s)?;
+
+        let (s, name) = utils::extract_ident(s)?;
+        let (s, _) = utils::extract_whitespace(s);
+
+        let (s, params) = utils::sequence(
+            |s| utils::extract_ident(s).map(|(s, ident)| (s, ident.to_string())),
+            utils::extract_whitespace,
+            s,
+        )?;
+
+        let s = utils::tag(&quot;=&gt;&quot;, s)?;
+        let (s, _) = utils::extract_whitespace(s);
+
+        let (s, body) = Stmt::new(s)?;
+
+        Ok((
+            s,
+            Self {
+                name: name.to_string(),
+                params,
+                body: Box::new(body),
+            },
+        ))
+    }
+
+    // snip
+}
+</code></pre><p>And now finally <code>FuncCall::new</code>, where we pass in a closure that accepts <em>only spaces,</em> not newlines. Let’s also adjust the extraction of whitespace after parsing out the callee so that it stays consistent:</p><pre><code class=language-rust>// func_call.rs
+
+impl FuncCall {
+    pub(super) fn new(s: &amp;str) -&gt; Result&lt;(&amp;str, Self), String&gt; {
+        let (s, callee) = utils::extract_ident(s)?;
+        let (s, _) = utils::take_while(|c| c == ' ', s);
+
+        let (s, params) = utils::sequence1(Expr::new, |s| utils::take_while(|c| c == ' ', s), s)?;
+
+        Ok((
+            s,
+            Self {
+                callee: callee.to_string(),
+                params,
+            },
+        ))
+    }
+}
+</code></pre><p>We’re using the same <code>take_while</code> function we used for <code>extract_whitespace</code>. The only thing left is to make <code>take_while</code> <code>pub(crate)</code> so that the <code>crate::expr::func_call</code> module can use it:</p><pre><code class=language-rust>// utils.rs
+
+pub(crate) fn take_while(accept: impl Fn(char) -&gt; bool, s: &amp;str) -&gt; (&amp;str, &amp;str) {
+    let extracted_end = s
+        .char_indices()
+        .find_map(|(idx, c)| if accept(c) { None } else { Some(idx) })
+        .unwrap_or_else(|| s.len());
+
+    let extracted = &amp;s[..extracted_end];
+    let remainder = &amp;s[extracted_end..];
+    (remainder, extracted)
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 54 tests
 ......................................................
 test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=evaluation>Evaluation</h1><p>Let’s start with a test:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eval_func_call</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>store_func</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;add&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>vec</span><span class=o>!</span><span class=p>[</span><span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w> </span><span class=s>&#34;y&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()],</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>lhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>rhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;y&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>Op</span>::<span class=n>Add</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>}),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>Expr</span>::<span class=n>FuncCall</span><span class=p>(</span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=s>&#34;add&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>2</span><span class=p>)),</span><span class=w> </span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>2</span><span class=p>))],</span><span class=w>
-</span><span class=w>            </span><span class=p>})</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Val</span>::<span class=n>Number</span><span class=p>(</span><span class=mi>4</span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We declare a function with the name <code>add</code> that takes two parameters, <code>x</code> and <code>y</code>, and has a body consisting of the addition of <code>x</code> and <code>y</code>. We then evaluate a call to <code>add</code> with the parameters <code>2</code> and <code>2</code>, expecting that the result will be <code>4</code>. Running this test panics due to the <code>todo!()</code> in <code>Expr::eval</code> that we added earlier. Let’s remove that, instead delegating to an as-yet unimplemented method on <code>FuncCall</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>Expr</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=bp>self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=n>n</span><span class=p>))</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Val</span>::<span class=n>Number</span><span class=p>(</span><span class=o>*</span><span class=n>n</span><span class=p>)),</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lhs</span><span class=p>,</span><span class=w> </span><span class=n>rhs</span><span class=p>,</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>FuncCall</span><span class=p>(</span><span class=n>func_call</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>func_call</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>binding_usage</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>binding_usage</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=n>Self</span>::<span class=n>Block</span><span class=p>(</span><span class=n>block</span><span class=p>)</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>block</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>How do you even evaluate a function call? The approach we’ll use is to create a new child environment from the environment being passed in, and add bindings for each of the parameters of the function call. After doing that we can evaluate the body of the function being called, knowing that the parameters used in the body are in the environment:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>create_child</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>param_names</span><span class=p>,</span><span class=w> </span><span class=n>body</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>get_func</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>callee</span><span class=p>).</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_expr</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>param_names</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>zip</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>param_val</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>param_expr</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>child_env</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=n>child_env</span><span class=p>.</span><span class=n>store_binding</span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_val</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>body</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><h1 id=evaluation>Evaluation</h1><p>Let’s start with a test:</p><pre><code class=language-rust>// expr.rs
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn eval_func_call() {
+        let mut env = Env::default();
+
+        env.store_func(
+            &quot;add&quot;.to_string(),
+            vec![&quot;x&quot;.to_string(), &quot;y&quot;.to_string()],
+            Stmt::Expr(Expr::Operation {
+                lhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;x&quot;.to_string(),
+                })),
+                rhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;y&quot;.to_string(),
+                })),
+                op: Op::Add,
+            }),
+        );
+
+        assert_eq!(
+            Expr::FuncCall(FuncCall {
+                callee: &quot;add&quot;.to_string(),
+                params: vec![Expr::Number(Number(2)), Expr::Number(Number(2))],
+            })
+            .eval(&amp;env),
+            Ok(Val::Number(4)),
+        );
+    }
+
+    // snip
+}
+</code></pre><p>We declare a function with the name <code>add</code> that takes two parameters, <code>x</code> and <code>y</code>, and has a body consisting of the addition of <code>x</code> and <code>y</code>. We then evaluate a call to <code>add</code> with the parameters <code>2</code> and <code>2</code>, expecting that the result will be <code>4</code>. Running this test panics due to the <code>todo!()</code> in <code>Expr::eval</code> that we added earlier. Let’s remove that, instead delegating to an as-yet unimplemented method on <code>FuncCall</code>:</p><pre><code class=language-rust>impl Expr {
+    // snip
+
+    pub(crate) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        match self {
+            Self::Number(Number(n)) =&gt; Ok(Val::Number(*n)),
+            Self::Operation { lhs, rhs, op } =&gt; {
+                // snip
+            }
+            Self::FuncCall(func_call) =&gt; func_call.eval(env),
+            Self::BindingUsage(binding_usage) =&gt; binding_usage.eval(env),
+            Self::Block(block) =&gt; block.eval(env),
+        }
+    }
+}
+</code></pre><p>How do you even evaluate a function call? The approach we’ll use is to create a new child environment from the environment being passed in, and add bindings for each of the parameters of the function call. After doing that we can evaluate the body of the function being called, knowing that the parameters used in the body are in the environment:</p><pre><code class=language-rust>// func_call.rs
+
+impl FuncCall {
+    // snip
+
+    pub(super) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        let mut child_env = env.create_child();
+
+        let (param_names, body) = env.get_func(&amp;self.callee).unwrap();
+
+        for (param_name, param_expr) in param_names.into_iter().zip(&amp;self.params) {
+            let param_val = param_expr.eval(&amp;child_env)?;
+            child_env.store_binding(param_name, param_val);
+        }
+
+        body.eval(&amp;mut child_env)
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 55 tests
 .......................................................
 test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Great! Let’s add another test to make sure we haven’t made any mistakes:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// still in func_call.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=k>super</span>::<span class=p>{</span><span class=n>BindingUsage</span><span class=p>,</span><span class=w> </span><span class=n>Number</span><span class=p>};</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eval_func_call</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>store_func</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;id&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>vec</span><span class=o>!</span><span class=p>[</span><span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()],</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>name</span>: <span class=s>&#34;x&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=p>})),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=s>&#34;id&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>10</span><span class=p>))],</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Ok</span><span class=p>(</span><span class=n>Val</span>::<span class=n>Number</span><span class=p>(</span><span class=mi>10</span><span class=p>)),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Great! Let’s add another test to make sure we haven’t made any mistakes:</p><pre><code class=language-rust>// still in func_call.rs
+
+#[cfg(test)]
+mod tests {
+    use super::super::{BindingUsage, Number};
+    use super::*;
+    use crate::stmt::Stmt;
+
+    // snip
+
+    #[test]
+    fn eval_func_call() {
+        let mut env = Env::default();
+
+        env.store_func(
+            &quot;id&quot;.to_string(),
+            vec![&quot;x&quot;.to_string()],
+            Stmt::Expr(Expr::BindingUsage(BindingUsage {
+                name: &quot;x&quot;.to_string(),
+            })),
+        );
+
+        assert_eq!(
+            FuncCall {
+                callee: &quot;id&quot;.to_string(),
+                params: vec![Expr::Number(Number(10))],
+            }
+            .eval(&amp;env),
+            Ok(Val::Number(10)),
+        );
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 56 tests
 ........................................................
 test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>There’s something missing, though: error handling. There are three possible errors that can occur only when evaluating a function call:</p><ul><li>non-existent function</li><li>too few parameters</li><li>too many parameters</li></ul><p>First, we’ll add a test for the case where the function being called doesn’t exist:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eval_non_existent_func_call</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=s>&#34;i_dont_exist&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>1</span><span class=p>))],</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;function with name ‘i_dont_exist’ does not exist&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To make this pass, we need to convert the <code>.unwrap()</code> in <code>FuncCall::eval</code> to a <code>?</code> so it forwards on the error message <code>Env</code> helpfully creates for us:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>create_child</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>param_names</span><span class=p>,</span><span class=w> </span><span class=n>body</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>get_func</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>callee</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_expr</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>param_names</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>zip</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>param_val</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>param_expr</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>child_env</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=n>child_env</span><span class=p>.</span><span class=n>store_binding</span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_val</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>body</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Next up is matching the number of parameters in the function call with the function definition. Let’s write a test for each possibility:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=k>super</span>::<span class=p>{</span><span class=n>BindingUsage</span><span class=p>,</span><span class=w> </span><span class=n>Number</span><span class=p>,</span><span class=w> </span><span class=n>Op</span><span class=p>};</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>stmt</span>::<span class=n>Stmt</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eval_func_call_with_too_few_parameters</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>store_func</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;mul&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>vec</span><span class=o>!</span><span class=p>[</span><span class=s>&#34;a&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w> </span><span class=s>&#34;b&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()],</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>lhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;a&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>rhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;b&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>Op</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>}),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=s>&#34;mul&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>100</span><span class=p>))],</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;expected 2 parameters, got 1&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eval_func_call_with_too_many_parameters</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Env</span>::<span class=n>default</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>store_func</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;square&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>vec</span><span class=o>!</span><span class=p>[</span><span class=s>&#34;n&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()],</span><span class=w>
-</span><span class=w>            </span><span class=n>Stmt</span>::<span class=n>Expr</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>Operation</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>lhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;n&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>rhs</span>: <span class=nb>Box</span>::<span class=n>new</span><span class=p>(</span><span class=n>Expr</span>::<span class=n>BindingUsage</span><span class=p>(</span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>name</span>: <span class=s>&#34;n&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>})),</span><span class=w>
-</span><span class=w>                </span><span class=n>op</span>: <span class=nc>Op</span>::<span class=n>Mul</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>}),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>callee</span>: <span class=s>&#34;square&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>params</span>: <span class=nc>vec</span><span class=o>!</span><span class=p>[</span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>5</span><span class=p>)),</span><span class=w> </span><span class=n>Expr</span>::<span class=n>Number</span><span class=p>(</span><span class=n>Number</span><span class=p>(</span><span class=mi>42</span><span class=p>))],</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>env</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=nb>Err</span><span class=p>(</span><span class=s>&#34;expected 1 parameters, got 2&#34;</span><span class=p>.</span><span class=n>to_string</span><span class=p>()),</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The code may not be pretty, but I guess it gets the job done. Here’s how we can make those two tests pass:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=w> </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>create_child</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>param_names</span><span class=p>,</span><span class=w> </span><span class=n>body</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>get_func</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>callee</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>num_expected_params</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>param_names</span><span class=p>.</span><span class=n>len</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>num_actual_params</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>params</span><span class=p>.</span><span class=n>len</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>num_expected_params</span><span class=w> </span><span class=o>!=</span><span class=w> </span><span class=n>num_actual_params</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>return</span><span class=w> </span><span class=nb>Err</span><span class=p>(</span><span class=n>format</span><span class=o>!</span><span class=p>(</span><span class=w>
-</span><span class=w>                </span><span class=s>&#34;expected {} parameters, got {}&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>                </span><span class=n>num_expected_params</span><span class=p>,</span><span class=w> </span><span class=n>num_actual_params</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=p>));</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_expr</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>param_names</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>zip</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>params</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=kd>let</span><span class=w> </span><span class=n>param_val</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>param_expr</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=n>child_env</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=n>child_env</span><span class=p>.</span><span class=n>store_binding</span><span class=p>(</span><span class=n>param_name</span><span class=p>,</span><span class=w> </span><span class=n>param_val</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>body</span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>child_env</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>There’s something missing, though: error handling. There are three possible errors that can occur only when evaluating a function call:</p><ul><li>non-existent function</li><li>too few parameters</li><li>too many parameters</li></ul><p>First, we’ll add a test for the case where the function being called doesn’t exist:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn eval_non_existent_func_call() {
+        let env = Env::default();
+
+        assert_eq!(
+            FuncCall {
+                callee: &quot;i_dont_exist&quot;.to_string(),
+                params: vec![Expr::Number(Number(1))],
+            }
+            .eval(&amp;env),
+            Err(&quot;function with name ‘i_dont_exist’ does not exist&quot;.to_string()),
+        );
+    }
+}
+</code></pre><p>To make this pass, we need to convert the <code>.unwrap()</code> in <code>FuncCall::eval</code> to a <code>?</code> so it forwards on the error message <code>Env</code> helpfully creates for us:</p><pre><code class=language-rust>impl FuncCall {
+    // snip
+
+    pub(super) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        let mut child_env = env.create_child();
+
+        let (param_names, body) = env.get_func(&amp;self.callee)?;
+
+        for (param_name, param_expr) in param_names.into_iter().zip(&amp;self.params) {
+            let param_val = param_expr.eval(&amp;child_env)?;
+            child_env.store_binding(param_name, param_val);
+        }
+
+        body.eval(&amp;mut child_env)
+    }
+}
+</code></pre><p>Next up is matching the number of parameters in the function call with the function definition. Let’s write a test for each possibility:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    use super::super::{BindingUsage, Number, Op};
+    use super::*;
+    use crate::stmt::Stmt;
+
+    // snip
+
+    #[test]
+    fn eval_func_call_with_too_few_parameters() {
+        let mut env = Env::default();
+
+        env.store_func(
+            &quot;mul&quot;.to_string(),
+            vec![&quot;a&quot;.to_string(), &quot;b&quot;.to_string()],
+            Stmt::Expr(Expr::Operation {
+                lhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;a&quot;.to_string(),
+                })),
+                rhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;b&quot;.to_string(),
+                })),
+                op: Op::Mul,
+            }),
+        );
+
+        assert_eq!(
+            FuncCall {
+                callee: &quot;mul&quot;.to_string(),
+                params: vec![Expr::Number(Number(100))],
+            }
+            .eval(&amp;env),
+            Err(&quot;expected 2 parameters, got 1&quot;.to_string()),
+        );
+    }
+
+    #[test]
+    fn eval_func_call_with_too_many_parameters() {
+        let mut env = Env::default();
+
+        env.store_func(
+            &quot;square&quot;.to_string(),
+            vec![&quot;n&quot;.to_string()],
+            Stmt::Expr(Expr::Operation {
+                lhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;n&quot;.to_string(),
+                })),
+                rhs: Box::new(Expr::BindingUsage(BindingUsage {
+                    name: &quot;n&quot;.to_string(),
+                })),
+                op: Op::Mul,
+            }),
+        );
+
+        assert_eq!(
+            FuncCall {
+                callee: &quot;square&quot;.to_string(),
+                params: vec![Expr::Number(Number(5)), Expr::Number(Number(42))],
+            }
+            .eval(&amp;env),
+            Err(&quot;expected 1 parameters, got 2&quot;.to_string()),
+        );
+    }
+}
+</code></pre><p>The code may not be pretty, but I guess it gets the job done. Here’s how we can make those two tests pass:</p><pre><code class=language-rust>impl FuncCall {
+    // snip
+
+    pub(super) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        let mut child_env = env.create_child();
+
+        let (param_names, body) = env.get_func(&amp;self.callee)?;
+
+        let num_expected_params = param_names.len();
+        let num_actual_params = self.params.len();
+
+        if num_expected_params != num_actual_params {
+            return Err(format!(
+                &quot;expected {} parameters, got {}&quot;,
+                num_expected_params, num_actual_params,
+            ));
+        }
+
+        for (param_name, param_expr) in param_names.into_iter().zip(&amp;self.params) {
+            let param_val = param_expr.eval(&amp;child_env)?;
+            child_env.store_binding(param_name, param_val);
+        }
+
+        body.eval(&amp;mut child_env)
+    }
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 59 tests
 ...........................................................
 test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We still haven’t implemented function calls with no parameters, though. Eldiro doesn’t currently have side effects of any kind, so we can’t test whether a parameter-less function call has taken place. Regardless, let’s implement the feature:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// binding_usage.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>BindingUsage</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eval</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>env</span>: <span class=kp>&amp;</span><span class=nc>Env</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Result</span><span class=o>&lt;</span><span class=n>Val</span><span class=p>,</span><span class=w> </span><span class=nb>String</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>env</span><span class=p>.</span><span class=n>get_binding</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>name</span><span class=p>).</span><span class=n>or_else</span><span class=p>(</span><span class=o>|</span><span class=n>error_msg</span><span class=o>|</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=n>env</span><span class=p>.</span><span class=n>get_func</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>.</span><span class=n>name</span><span class=p>).</span><span class=n>is_ok</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>FuncCall</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=n>callee</span>: <span class=nc>self</span><span class=p>.</span><span class=n>name</span><span class=p>.</span><span class=n>clone</span><span class=p>(),</span><span class=w>
-</span><span class=w>                    </span><span class=n>params</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>                </span><span class=p>.</span><span class=n>eval</span><span class=p>(</span><span class=n>env</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w> </span><span class=k>else</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=nb>Err</span><span class=p>(</span><span class=n>error_msg</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>})</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What this is doing is first trying to obtain the binding usage just as we would do normally; however, if it cannot be found, the error message is saved, and, if the environment contains a function with the same name as the binding usage, the corresponding function call is constructed and evaluated. If this function doesn’t exist, then the error message from the binding usage is used. This prevents using a non-existent binding and getting an error message about a non-existent function instead.</p><p>Let’s run our test suite to see if we’ve broken anything in the process:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>We still haven’t implemented function calls with no parameters, though. Eldiro doesn’t currently have side effects of any kind, so we can’t test whether a parameter-less function call has taken place. Regardless, let’s implement the feature:</p><pre><code class=language-rust>// binding_usage.rs
+
+impl BindingUsage {
+    // snip
+
+    pub(super) fn eval(&amp;self, env: &amp;Env) -&gt; Result&lt;Val, String&gt; {
+        env.get_binding(&amp;self.name).or_else(|error_msg| {
+            if env.get_func(&amp;self.name).is_ok() {
+                FuncCall {
+                    callee: self.name.clone(),
+                    params: Vec::new(),
+                }
+                .eval(env)
+            } else {
+                Err(error_msg)
+            }
+        })
+    }
+}
+</code></pre><p>What this is doing is first trying to obtain the binding usage just as we would do normally; however, if it cannot be found, the error message is saved, and, if the environment contains a function with the same name as the binding usage, the corresponding function call is constructed and evaluated. If this function doesn’t exist, then the error message from the binding usage is used. This prevents using a non-existent binding and getting an error message about a non-existent function instead.</p><p>Let’s run our test suite to see if we’ve broken anything in the process:</p><pre><code class=language-->$ cargo t -q
 running 59 tests
 ...........................................................
 test result: ok. 59 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>And with that, this part is done. Good job on getting this far. If you like, you can stop here, and keep adding features to your implementation of Eldiro. If you want to continue following this series, read on.</p><h1 id=problems-with-the-current-implementation>Problems with the current implementation</h1><p>The implementation of Eldiro we have been writing together has a number of problems that have either arisen due to</p><ul><li>my unwillingness to refactor throughout the series (why waste readers’ time doing menial refactoring when you could be explaining interesting topics?)</li><li>a lack of planning, or</li><li>the ‘worse’ way being easier to understand and teach</li></ul><p>Here’s a list of everything ‘wrong’ with it at the moment:</p><ul><li>Parsing something requires going through all the options until one that parses successfully is found. This is slower than looking at the input and determining which option the input is representing (this is called <em>predictive parsing</em>), since the same part of the input is examined multiple times.</li><li><code>crate::expr::Number</code> and <code>crate::expr::BindingDef</code> should be ‘inlined’ into <code>Expr</code>’s definition rather than in their own structures, since their implementations are so short that making them separate results in too much boilerplate for the separation to be worth the trouble. <code>Expr::new_number</code> could similarly be inlined into <code>Expr::new_non_operation</code>, which also makes it more consistent with how all the other non-<code>Operation</code> variants of <code>Expr</code> are parsed.</li><li>Error messages don’t have location information.</li><li>Parsing stops at the first error, rather than recovering and attempting to parse as much out of the input as possible.</li><li>Operations can’t be nested (for example, <code>6 + 2 * 3</code> doesn’t parse).</li><li>Error messages are strings, rather than proper structured data.</li></ul><p>The basic architecture that Eldiro is currently using is flawed &ndash; by working with the underlying text directly, it forces the language to re-examine the input again and again during parsing. This also makes it more difficult to recover from errors. Furthermore, if we ever want to implement static analysis (analysing code without running it; for example, a squiggly underline for an undefined binding in an editor), we need to be able to represent incomplete code. Take <code>BindingDef</code> as an example. In its current form, both a name and a value <em>have</em> to be present:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[derive(Debug, Clone, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>BindingDef</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>name</span>: <span class=nb>String</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>val</span>: <span class=nc>Expr</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s say we’re in the middle of typing <code>let a =</code> in the editor &ndash; how is our hypothetical static analysis tooling meant to represent that code internally? It isn’t possible with our current architecture. And no, wrapping all the fields of our data structures in <code>Option</code>s isn’t feasible, either. Moreover, to display squigglies (and to have remotely helpful error messages) we need to store location information, which is tedious. Imagine having to add a field <code>span</code> to every single data structure!</p><p>The solution to some of these problems is to use <a href=https://github.com/rust-analyzer/rowan>Rowan</a>, a library that lets us represent incomplete code. In fact, it represents <em>all text</em> losslessly, which makes it well-suited to tooling that runs in a user’s editor. <a href=https://github.com/rust-analyzer/rust-analyzer>rust-analyzer</a> <a href=https://github.com/rust-analyzer/rust-analyzer/blob/master/docs/dev/syntax.md>uses Rowan</a> internally, which is based on <a href=https://github.com/dotnet/roslyn>Roslyn</a> and <a href=https://github.com/apple/swift/tree/main/lib/Syntax>lib/Syntax</a> from Swift.</p><p>Using Rowan mandates that we use a <em>lexer,</em> which is a program that takes a string as an input and slices it up into little pieces &ndash; here’s an example relevant to Eldiro:</p><pre tabindex=0><code>fn add x y =&gt; x + y
+</code></pre><p>And with that, this part is done. Good job on getting this far. If you like, you can stop here, and keep adding features to your implementation of Eldiro. If you want to continue following this series, read on.</p><h1 id=problems-with-the-current-implementation>Problems with the current implementation</h1><p>The implementation of Eldiro we have been writing together has a number of problems that have either arisen due to</p><ul><li>my unwillingness to refactor throughout the series (why waste readers’ time doing menial refactoring when you could be explaining interesting topics?)</li><li>a lack of planning, or</li><li>the ‘worse’ way being easier to understand and teach</li></ul><p>Here’s a list of everything ‘wrong’ with it at the moment:</p><ul><li>Parsing something requires going through all the options until one that parses successfully is found. This is slower than looking at the input and determining which option the input is representing (this is called <em>predictive parsing</em>), since the same part of the input is examined multiple times.</li><li><code>crate::expr::Number</code> and <code>crate::expr::BindingDef</code> should be ‘inlined’ into <code>Expr</code>’s definition rather than in their own structures, since their implementations are so short that making them separate results in too much boilerplate for the separation to be worth the trouble. <code>Expr::new_number</code> could similarly be inlined into <code>Expr::new_non_operation</code>, which also makes it more consistent with how all the other non-<code>Operation</code> variants of <code>Expr</code> are parsed.</li><li>Error messages don’t have location information.</li><li>Parsing stops at the first error, rather than recovering and attempting to parse as much out of the input as possible.</li><li>Operations can’t be nested (for example, <code>6 + 2 * 3</code> doesn’t parse).</li><li>Error messages are strings, rather than proper structured data.</li></ul><p>The basic architecture that Eldiro is currently using is flawed &ndash; by working with the underlying text directly, it forces the language to re-examine the input again and again during parsing. This also makes it more difficult to recover from errors. Furthermore, if we ever want to implement static analysis (analysing code without running it; for example, a squiggly underline for an undefined binding in an editor), we need to be able to represent incomplete code. Take <code>BindingDef</code> as an example. In its current form, both a name and a value <em>have</em> to be present:</p><pre><code class=language-rust>#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct BindingDef {
+    pub(crate) name: String,
+    pub(crate) val: Expr,
+}
+</code></pre><p>Let’s say we’re in the middle of typing <code>let a =</code> in the editor &ndash; how is our hypothetical static analysis tooling meant to represent that code internally? It isn’t possible with our current architecture. And no, wrapping all the fields of our data structures in <code>Option</code>s isn’t feasible, either. Moreover, to display squigglies (and to have remotely helpful error messages) we need to store location information, which is tedious. Imagine having to add a field <code>span</code> to every single data structure!</p><p>The solution to some of these problems is to use <a href=https://github.com/rust-analyzer/rowan>Rowan</a>, a library that lets us represent incomplete code. In fact, it represents <em>all text</em> losslessly, which makes it well-suited to tooling that runs in a user’s editor. <a href=https://github.com/rust-analyzer/rust-analyzer>rust-analyzer</a> <a href=https://github.com/rust-analyzer/rust-analyzer/blob/master/docs/dev/syntax.md>uses Rowan</a> internally, which is based on <a href=https://github.com/dotnet/roslyn>Roslyn</a> and <a href=https://github.com/apple/swift/tree/main/lib/Syntax>lib/Syntax</a> from Swift.</p><p>Using Rowan mandates that we use a <em>lexer,</em> which is a program that takes a string as an input and slices it up into little pieces &ndash; here’s an example relevant to Eldiro:</p><pre><code>fn add x y =&gt; x + y
 let result = add 5 5
-</code></pre><p>might be <em>lexed,</em> or <em>tokenised,</em> as</p><pre tabindex=0><code>FnKw (&quot;fn&quot;)
+</code></pre><p>might be <em>lexed,</em> or <em>tokenised,</em> as</p><pre><code>FnKw (&quot;fn&quot;)
 Ident (&quot;add&quot;)
 Ident (&quot;x&quot;)
 Ident (&quot;y&quot;)

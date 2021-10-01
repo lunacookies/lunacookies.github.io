@@ -1,530 +1,532 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Thirteen: Whitespace & Events · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.b763c3746f235d1e84e23bc1b3d94a46534216d5bbae8ce5b8ae93e8c0816df3.css integrity="sha256-t2PDdG8jXR6E4jvBs9lKRlNCFtW7rozluK6T6MCBbfM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Thirteen: Whitespace & Events · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.04c23afe51262a10ee61829da41f4d7318ff311ed0d0bcbf1db0fde96e3830f4.css integrity="sha256-BMI6/lEmKhDuYYKdpB9Ncxj/MR7Q0Ly/HbD96W44MPQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Thirteen: Whitespace & Events</h1><section class=page-info><ul><li>9 December 2020</li><li>1758 words</li><li>nine minute read</li></ul></section></header><main><h1 id=the-simple-but-annoying-approach>The simple but annoying approach</h1><p>We could check for the presence of whitespace after every token:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// do some stuff
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>if</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// do some more stuff
-</span></code></pre></div><p>It gets annoying to type that out each time, so we could define a <code>eat_whitespace</code> method:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// Only hypothetical; don’t write this!
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parser</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>eat_whitespace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>p</span><span class=p>.</span><span class=n>bump</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Nevertheless, being forced to write out a <code>p.eat_whitespace()</code> call every single time we add a token to a branch is annoying.</p><h1 id=the-complex-but-invisible-approach>The complex but invisible approach</h1><p>Instead of manually handling whitespace, we can create our own abstraction over Rowan in the form of <em>events</em> &ndash; every time <code>Parser::start_node</code> is called, for example, we’ll push to a <code>Vec</code> of <code>Event</code> enums. The same goes for all the other methods on <code>Parser</code> that interact with Rowan &ndash; each of them gets its own <code>Event</code> enum variant. After we’re done with parsing, we can construct a tree by applying these events to a <code>GreenNodeBuilder</code>. Crucially, it is at this step that we locate the whitespace tokens missing from the parser’s events, allowing us to add them to the syntax tree as necessary. This way we can handle whitespace in one place, divorcing it from the parser.</p><p>Events can make our parser faster if we have a previous parse tree lying around; rather than constructing a new parse tree every time, we can patch an existing one with the events of the new parse. Another benefit that events bring is their decoupling of the parser from the syntax tree implementation. This makes both the parser and especially the syntax tree easier to modify in future. It also gives us the opportunity to share the parser between multiple syntax tree implementations.</p><h1 id=making-our-parser-event-based>Making our parser event-based</h1><p>Let’s start by defining what an event is:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/event.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{}</span><span class=w>
-</span></code></pre></div><p>The only things our parser does that could become events are:</p><ul><li>starting nodes</li><li>starting nodes at a given checkpoint</li><li>adding tokens</li><li>finishing nodes</li></ul><p>Let’s add variants to <code>Event</code> for each of these:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>SmolStr</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span>: <span class=kt>usize</span> <span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>text</span>: <span class=nc>SmolStr</span><span class=w> </span><span class=p>},</span><span class=w>
-</span><span class=w>    </span><span class=n>FinishNode</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s now adjust the helper methods on our parser to add events instead of taking action directly. We won’t need the <code>builder</code> field on <code>Parser</code> anymore either:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>iter</span>::<span class=n>Peekable</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>lexer</span>: <span class=nc>Peekable</span><span class=o>&lt;</span><span class=n>Lexer</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=na>&#39;a</span><span class=w> </span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>lexer</span>: <span class=nc>Lexer</span>::<span class=n>new</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>peekable</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start_node</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>start_node_at</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span>: <span class=kt>usize</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>finish_node</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexer</span><span class=p>.</span><span class=n>next</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>text</span>: <span class=nc>text</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>checkpoint</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>usize</span> <span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>len</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that our parser is constructing events instead of a parse tree, we need a way to get a parse tree out of that <code>Vec&lt;Event></code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>iter</span>::<span class=n>Peekable</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>finish_node</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>sink</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Sink</span>::<span class=n>new</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>green_node</span>: <span class=nc>sink</span><span class=p>.</span><span class=n>finish</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>Checkpoint</span><span class=p>,</span><span class=w> </span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Sink</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span><span class=o>&lt;</span><span class=nb>&#39;static</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Sink</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>))</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=w>
-</span><span class=w>                    </span><span class=p>.</span><span class=n>builder</span><span class=w>
-</span><span class=w>                    </span><span class=p>.</span><span class=n>start_node_at</span><span class=p>(</span><span class=n>Checkpoint</span><span class=p>(</span><span class=n>checkpoint</span><span class=p>),</span><span class=w> </span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>)),</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>),</span><span class=w> </span><span class=n>text</span><span class=p>)</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>What we’ve done here is recreate what all those helper methods on <code>Parser</code> did before we modified them to use events; for example, when we encounter the <code>FinishNode</code> event we call <code>self.builder.finish_node()</code>, which is what we did earlier in <code>Parser::finish_node</code>. The code doesn’t compile, though, because the <code>usize</code> that <code>rowan::Checkpoint</code> contains isn’t public, so we can’t create an instance manually. There isn’t any way for us to create a <code>Checkpoint</code>, which means we’ll have to adjust our code to avoid using <code>GreenNodeBuilder::start_node_at</code>.</p><p>Currently we rely on Rowan to wrap all the nodes added since the last call to <code>checkpoint</code>; these nodes are wrapped in the <code>SyntaxKind</code> the event has specified. Rather than doing this, we can instead ‘rewrite history’ by moving the <code>StartNodeAt</code> event to earlier in <code>events</code> where <code>checkpoint</code> was called:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Clone)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Sink</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>clone</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>event</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>into_iter</span><span class=p>().</span><span class=n>enumerate</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>reordered_events</span><span class=p>.</span><span class=n>remove</span><span class=p>(</span><span class=n>idx</span><span class=p>);</span><span class=w>
-</span><span class=w>                </span><span class=n>reordered_events</span><span class=p>.</span><span class=n>insert</span><span class=p>(</span><span class=n>checkpoint</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>))</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>unreachable</span><span class=o>!</span><span class=p>(),</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                    </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>),</span><span class=w> </span><span class=n>text</span><span class=p>)</span><span class=w>
-</span><span class=w>                </span><span class=p>}</span><span class=w>
-</span><span class=w>                </span><span class=n>Event</span>::<span class=n>FinishNode</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish_node</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>finish</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how we modify a clone of the original <code>events</code> because we can’t mutate something while we’re iterating over it (<a href=https://docs.rs/dtolnay/0.0.9/dtolnay/macro._02__reference_types.html>you can’t obtain a unique borrow to something while a shared borrow is outstanding</a>).</p><h1 id=preparation>Preparation</h1><p>Let’s now get ready to implement automatic consumption of whitespace. The source of lexemes in our parser is currently a <code>Peekable&lt;Lexer&lt;'_>></code>; our sink also needs to have its own copy so that it can reconstruct where the whitespace that is missing from <code>events</code> is located. Creating the <code>Peekable&lt;Lexer&lt;'_>></code> twice would not be ideal, since it would mean unnecessarily lexing the input twice. Instead, we should lex the input just once and collect the results, giving both the parser and the sink a reference to the resulting <code>Vec&lt;(SyntaxKind, &str)></code>.</p><p>The first modification we should make is to create a separate <code>parse</code> function that handles lexing, as well as the creation of the parser as well as the sink:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>lexemes</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexer</span>::<span class=n>new</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>collect</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parser</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Parser</span>::<span class=n>new</span><span class=p>(</span><span class=o>&amp;</span><span class=n>lexemes</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>events</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span><span class=p>.</span><span class=n>parse</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>sink</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Sink</span>::<span class=n>new</span><span class=p>(</span><span class=o>&amp;</span><span class=n>lexemes</span><span class=p>,</span><span class=w> </span><span class=n>events</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>green_node</span>: <span class=nc>sink</span><span class=p>.</span><span class=n>finish</span><span class=p>(),</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now <code>Parser</code> doesn’t need to be <code>pub</code>, since it’s abstracted over by <code>parse</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>lexer</span>: <span class=nc>Peekable</span><span class=o>&lt;</span><span class=n>Lexer</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>While we’re here we may as well replace <code>lexer</code> with a <code>lexemes</code> field and a <code>cursor</code> to represent what point we’re up to:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)],</span><span class=w>
-</span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have to update some of <code>Parser</code>’s helper functions, as well as its constructor:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>cursor</span>: <span class=mi>0</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>start_node</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>finish_node</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>text</span>: <span class=nc>text</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>).</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>_</span><span class=p>)</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Next we have to update <code>Sink</code> to hold its own copy of the lexemes:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span><span class=o>&lt;</span><span class=nb>&#39;static</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)],</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[(</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=o>&amp;</span><span class=na>&#39;input</span><span class=w> </span><span class=kt>str</span><span class=p>)],</span><span class=w> </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Our CLI isn’t compiling because it refers to <code>Parser</code>, which we made private earlier. Let’s replace this reference with our new <code>parse</code> function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro-cli/src/main.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>eldiro</span>::<span class=n>parser</span>::<span class=n>parse</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>main</span><span class=p>()</span><span class=w> </span>-&gt; <span class=nc>io</span>::<span class=nb>Result</span><span class=o>&lt;</span><span class=p>()</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>stdin</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdin</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>stdout</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>io</span>::<span class=n>stdout</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=nb>String</span>::<span class=n>new</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>write</span><span class=o>!</span><span class=p>(</span><span class=n>stdout</span><span class=p>,</span><span class=w> </span><span class=s>&#34;→ &#34;</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=n>stdout</span><span class=p>.</span><span class=n>flush</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>stdin</span><span class=p>.</span><span class=n>read_line</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=n>input</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=o>&amp;</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>println</span><span class=o>!</span><span class=p>(</span><span class=s>&#34;{}&#34;</span><span class=p>,</span><span class=w> </span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=n>input</span><span class=p>.</span><span class=n>clear</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We have an unused import in <code>crates/eldiro/src/parser.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Finally, the last error remaining is the <code>check</code> function, which we need to update to use <code>parse</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_tree</span>: <span class=nc>expect_test</span>::<span class=n>Expect</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=n>expected_tree</span><span class=p>.</span><span class=n>assert_eq</span><span class=p>(</span><span class=o>&amp;</span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+<script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Thirteen: Whitespace & Events</h1><section class=page-info><ul><li>9 December 2020</li><li>2879 words</li><li>14 minute read</li></ul></section></header><main><h1 id=the-simple-but-annoying-approach>The simple but annoying approach</h1><p>We could check for the presence of whitespace after every token:</p><pre><code class=language-rust>// do some stuff
+
+if p.peek() == Some(SyntaxKind::Whitespace) {
+    p.bump();
+}
+
+// do some more stuff
+</code></pre><p>It gets annoying to type that out each time, so we could define a <code>eat_whitespace</code> method:</p><pre><code class=language-rust>// Only hypothetical; don’t write this!
+
+impl Parser {
+    pub(crate) fn eat_whitespace(&amp;mut self) {
+        if p.peek() == Some(SyntaxKind::Whitespace) {
+            p.bump();
+        }
+    }
+}
+</code></pre><p>Nevertheless, being forced to write out a <code>p.eat_whitespace()</code> call every single time we add a token to a branch is annoying.</p><h1 id=the-complex-but-invisible-approach>The complex but invisible approach</h1><p>Instead of manually handling whitespace, we can create our own abstraction over Rowan in the form of <em>events</em> &ndash; every time <code>Parser::start_node</code> is called, for example, we’ll push to a <code>Vec</code> of <code>Event</code> enums. The same goes for all the other methods on <code>Parser</code> that interact with Rowan &ndash; each of them gets its own <code>Event</code> enum variant. After we’re done with parsing, we can construct a tree by applying these events to a <code>GreenNodeBuilder</code>. Crucially, it is at this step that we locate the whitespace tokens missing from the parser’s events, allowing us to add them to the syntax tree as necessary. This way we can handle whitespace in one place, divorcing it from the parser.</p><p>Events can make our parser faster if we have a previous parse tree lying around; rather than constructing a new parse tree every time, we can patch an existing one with the events of the new parse. Another benefit that events bring is their decoupling of the parser from the syntax tree implementation. This makes both the parser and especially the syntax tree easier to modify in future. It also gives us the opportunity to share the parser between multiple syntax tree implementations.</p><h1 id=making-our-parser-event-based>Making our parser event-based</h1><p>Let’s start by defining what an event is:</p><pre><code class=language-rust>// parser.rs
+
+mod event;
+mod expr;
+</code></pre><pre><code class=language-rust>// src/parser/event.rs
+
+#[derive(Debug)]
+pub(super) enum Event {}
+</code></pre><p>The only things our parser does that could become events are:</p><ul><li>starting nodes</li><li>starting nodes at a given checkpoint</li><li>adding tokens</li><li>finishing nodes</li></ul><p>Let’s add variants to <code>Event</code> for each of these:</p><pre><code class=language-rust>use crate::lexer::SyntaxKind;
+use rowan::SmolStr;
+
+#[derive(Debug)]
+pub(super) enum Event {
+    StartNode { kind: SyntaxKind },
+    StartNodeAt { kind: SyntaxKind, checkpoint: usize },
+    AddToken { kind: SyntaxKind, text: SmolStr },
+    FinishNode,
+}
+</code></pre><p>Let’s now adjust the helper methods on our parser to add events instead of taking action directly. We won’t need the <code>builder</code> field on <code>Parser</code> anymore either:</p><pre><code class=language-rust>// parser.rs
+
+mod event;
+mod expr;
+
+use crate::lexer::{Lexer, SyntaxKind};
+use crate::syntax::SyntaxNode;
+use event::Event;
+use expr::expr;
+use rowan::GreenNode;
+use std::iter::Peekable;
+
+pub struct Parser&lt;'a&gt; {
+    lexer: Peekable&lt;Lexer&lt;'a&gt;&gt;,
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'a&gt; Parser&lt;'a&gt; {
+    pub fn new(input: &amp;'a str) -&gt; Self {
+        Self {
+            lexer: Lexer::new(input).peekable(),
+            events: Vec::new(),
+        }
+    }
+
+    // snip
+
+    fn start_node(&amp;mut self, kind: SyntaxKind) {
+        self.events.push(Event::StartNode { kind });
+    }
+
+    fn start_node_at(&amp;mut self, checkpoint: usize, kind: SyntaxKind) {
+        self.events.push(Event::StartNodeAt { kind, checkpoint });
+    }
+
+    fn finish_node(&amp;mut self) {
+        self.events.push(Event::FinishNode);
+    }
+
+    fn bump(&amp;mut self) {
+        let (kind, text) = self.lexer.next().unwrap();
+
+        self.events.push(Event::AddToken {
+            kind,
+            text: text.into(),
+        });
+    }
+
+    fn checkpoint(&amp;self) -&gt; usize {
+        self.events.len()
+    }
+
+    // snip
+}
+</code></pre><p>Now that our parser is constructing events instead of a parse tree, we need a way to get a parse tree out of that <code>Vec&lt;Event></code>:</p><pre><code class=language-rust>mod event;
+mod expr;
+mod sink;
+
+use crate::lexer::{Lexer, SyntaxKind};
+use crate::syntax::SyntaxNode;
+use event::Event;
+use expr::expr;
+use rowan::GreenNode;
+use sink::Sink;
+use std::iter::Peekable;
+
+// snip
+
+impl&lt;'a&gt; Parser&lt;'a&gt; {
+    // snip
+
+    pub fn parse(mut self) -&gt; Parse {
+        self.start_node(SyntaxKind::Root);
+        expr(&amp;mut self);
+        self.finish_node();
+
+        let sink = Sink::new(self.events);
+
+        Parse {
+            green_node: sink.finish(),
+        }
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-rust>// src/parser/sink.rs
+
+use super::event::Event;
+use crate::syntax::EldiroLanguage;
+use rowan::{Checkpoint, GreenNode, GreenNodeBuilder, Language};
+
+pub(super) struct Sink {
+    builder: GreenNodeBuilder&lt;'static&gt;,
+    events: Vec&lt;Event&gt;,
+}
+
+impl Sink {
+    pub(super) fn new(events: Vec&lt;Event&gt;) -&gt; Self {
+        Self {
+            builder: GreenNodeBuilder::new(),
+            events,
+        }
+    }
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        for event in self.events {
+            match event {
+                Event::StartNode { kind } =&gt; {
+                    self.builder.start_node(EldiroLanguage::kind_to_raw(kind))
+                }
+                Event::StartNodeAt { kind, checkpoint } =&gt; self
+                    .builder
+                    .start_node_at(Checkpoint(checkpoint), EldiroLanguage::kind_to_raw(kind)),
+                Event::AddToken { kind, text } =&gt; {
+                    self.builder.token(EldiroLanguage::kind_to_raw(kind), text)
+                }
+                Event::FinishNode =&gt; self.builder.finish_node(),
+            }
+        }
+
+        self.builder.finish()
+    }
+}
+</code></pre><p>What we’ve done here is recreate what all those helper methods on <code>Parser</code> did before we modified them to use events; for example, when we encounter the <code>FinishNode</code> event we call <code>self.builder.finish_node()</code>, which is what we did earlier in <code>Parser::finish_node</code>. The code doesn’t compile, though, because the <code>usize</code> that <code>rowan::Checkpoint</code> contains isn’t public, so we can’t create an instance manually. There isn’t any way for us to create a <code>Checkpoint</code>, which means we’ll have to adjust our code to avoid using <code>GreenNodeBuilder::start_node_at</code>.</p><p>Currently we rely on Rowan to wrap all the nodes added since the last call to <code>checkpoint</code>; these nodes are wrapped in the <code>SyntaxKind</code> the event has specified. Rather than doing this, we can instead ‘rewrite history’ by moving the <code>StartNodeAt</code> event to earlier in <code>events</code> where <code>checkpoint</code> was called:</p><pre><code class=language-rust>// event.rs
+
+#[derive(Debug, Clone)]
+pub(super) enum Event {
+    // snip
+}
+</code></pre><pre><code class=language-rust>// sink.rs
+
+use super::event::Event;
+use crate::syntax::EldiroLanguage;
+use rowan::{GreenNode, GreenNodeBuilder, Language};
+
+// snip
+
+impl Sink {
+    // snip
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        let mut reordered_events = self.events.clone();
+
+        for (idx, event) in self.events.into_iter().enumerate() {
+            if let Event::StartNodeAt { kind, checkpoint } = event {
+                reordered_events.remove(idx);
+                reordered_events.insert(checkpoint, Event::StartNode { kind });
+            }
+        }
+
+        for event in reordered_events {
+            match event {
+                Event::StartNode { kind } =&gt; {
+                    self.builder.start_node(EldiroLanguage::kind_to_raw(kind))
+                }
+                Event::StartNodeAt { .. } =&gt; unreachable!(),
+                Event::AddToken { kind, text } =&gt; {
+                    self.builder.token(EldiroLanguage::kind_to_raw(kind), text)
+                }
+                Event::FinishNode =&gt; self.builder.finish_node(),
+            }
+        }
+
+        self.builder.finish()
+    }
+}
+</code></pre><p>Note how we modify a clone of the original <code>events</code> because we can’t mutate something while we’re iterating over it (<a href=https://docs.rs/dtolnay/0.0.9/dtolnay/macro._02__reference_types.html>you can’t obtain a unique borrow to something while a shared borrow is outstanding</a>).</p><h1 id=preparation>Preparation</h1><p>Let’s now get ready to implement automatic consumption of whitespace. The source of lexemes in our parser is currently a <code>Peekable&lt;Lexer&lt;'_>></code>; our sink also needs to have its own copy so that it can reconstruct where the whitespace that is missing from <code>events</code> is located. Creating the <code>Peekable&lt;Lexer&lt;'_>></code> twice would not be ideal, since it would mean unnecessarily lexing the input twice. Instead, we should lex the input just once and collect the results, giving both the parser and the sink a reference to the resulting <code>Vec&lt;(SyntaxKind, &str)></code>.</p><p>The first modification we should make is to create a separate <code>parse</code> function that handles lexing, as well as the creation of the parser as well as the sink:</p><pre><code class=language-rust>// parser.rs
+
+pub fn parse(input: &amp;str) -&gt; Parse {
+    let lexemes: Vec&lt;_&gt; = Lexer::new(input).collect();
+    let parser = Parser::new(&amp;lexemes);
+    let events = parser.parse();
+    let sink = Sink::new(&amp;lexemes, events);
+
+    Parse {
+        green_node: sink.finish(),
+    }
+}
+</code></pre><p>Now <code>Parser</code> doesn’t need to be <code>pub</code>, since it’s abstracted over by <code>parse</code>:</p><pre><code class=language-rust>struct Parser&lt;'a&gt; {
+    lexer: Peekable&lt;Lexer&lt;'a&gt;&gt;,
+    events: Vec&lt;Event&gt;,
+}
+</code></pre><p>While we’re here we may as well replace <code>lexer</code> with a <code>lexemes</code> field and a <code>cursor</code> to represent what point we’re up to:</p><pre><code class=language-rust>struct Parser&lt;'l, 'input&gt; {
+    lexemes: &amp;'l [(SyntaxKind, &amp;'input str)],
+    cursor: usize,
+    events: Vec&lt;Event&gt;,
+}
+</code></pre><p>We have to update some of <code>Parser</code>’s helper functions, as well as its constructor:</p><pre><code class=language-rust>impl&lt;'l, 'input&gt; Parser&lt;'l, 'input&gt; {
+    fn new(lexemes: &amp;'l [(SyntaxKind, &amp;'input str)]) -&gt; Self {
+        Self {
+            lexemes,
+            cursor: 0,
+            events: Vec::new(),
+        }
+    }
+
+    fn parse(mut self) -&gt; Vec&lt;Event&gt; {
+        self.start_node(SyntaxKind::Root);
+        expr(&amp;mut self);
+        self.finish_node();
+
+        self.events
+    }
+
+    // snip
+
+    fn bump(&amp;mut self) {
+        let (kind, text) = self.lexemes[self.cursor];
+
+        self.cursor += 1;
+        self.events.push(Event::AddToken {
+            kind,
+            text: text.into(),
+        });
+    }
+
+    // snip
+
+    fn peek(&amp;self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.lexemes.get(self.cursor).map(|(kind, _)| *kind)
+    }
+}
+</code></pre><p>Next we have to update <code>Sink</code> to hold its own copy of the lexemes:</p><pre><code class=language-rust>// sink.rs
+
+use super::event::Event;
+use crate::lexer::SyntaxKind;
+use crate::syntax::EldiroLanguage;
+use rowan::{GreenNode, GreenNodeBuilder, Language};
+
+pub(super) struct Sink&lt;'l, 'input&gt; {
+    builder: GreenNodeBuilder&lt;'static&gt;,
+    lexemes: &amp;'l [(SyntaxKind, &amp;'input str)],
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    pub(super) fn new(lexemes: &amp;'l [(SyntaxKind, &amp;'input str)], events: Vec&lt;Event&gt;) -&gt; Self {
+        Self {
+            builder: GreenNodeBuilder::new(),
+            lexemes,
+            events,
+        }
+    }
+
+    // snip
+}
+</code></pre><p>Our CLI isn’t compiling because it refers to <code>Parser</code>, which we made private earlier. Let’s replace this reference with our new <code>parse</code> function:</p><pre><code class=language-rust>// crates/eldiro-cli/src/main.rs
+
+use eldiro::parser::parse;
+use std::io::{self, Write};
+
+fn main() -&gt; io::Result&lt;()&gt; {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    let mut input = String::new();
+
+    loop {
+        write!(stdout, &quot;→ &quot;)?;
+        stdout.flush()?;
+
+        stdin.read_line(&amp;mut input)?;
+
+        let parse = parse(&amp;input);
+        println!(&quot;{}&quot;, parse.debug_tree());
+
+        input.clear();
+    }
+}
+</code></pre><p>We have an unused import in <code>crates/eldiro/src/parser.rs</code>:</p><pre><code class=language-rust>mod event;
+mod expr;
+mod sink;
+
+use crate::lexer::{Lexer, SyntaxKind};
+use crate::syntax::SyntaxNode;
+use event::Event;
+use expr::expr;
+use rowan::GreenNode;
+use sink::Sink;
+</code></pre><p>Finally, the last error remaining is the <code>check</code> function, which we need to update to use <code>parse</code>:</p><pre><code class=language-rust>#[cfg(test)]
+fn check(input: &amp;str, expected_tree: expect_test::Expect) {
+    let parse = parse(input);
+    expected_tree.assert_eq(&amp;parse.debug_tree());
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 27 tests
 ...........................
 test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s abstract away the combination of <code>SyntaxKind</code> and <code>&str</code> into its own structure, since the two are frequently being passed together (something called a <a href="https://youtu.be/DC-pQPq0acs?t=521">data clump</a>):</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lexer.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=nb>Iterator</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>Lexer</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>type</span> <span class=nc>Item</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>next</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>Self</span>::<span class=n>Item</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>kind</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>inner</span><span class=p>.</span><span class=n>next</span><span class=p>()</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>inner</span><span class=p>.</span><span class=n>slice</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>Self</span>::<span class=n>Item</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>})</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;a</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=n>text</span>: <span class=kp>&amp;</span><span class=na>&#39;a</span><span class=w> </span><span class=kt>str</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lexer</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexer</span>::<span class=n>new</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>assert_eq</span><span class=o>!</span><span class=p>(</span><span class=n>lexer</span><span class=p>.</span><span class=n>next</span><span class=p>(),</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span>: <span class=nc>input</span><span class=w> </span><span class=p>}));</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w>
-</span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>cursor</span>: <span class=mi>0</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>text</span>: <span class=nc>text</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>Lexeme</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span><span class=o>&lt;</span><span class=nb>&#39;static</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w> </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><h1 id=implementation-of-whitespace-skipping>Implementation of whitespace-skipping</h1><p>Now the machinery is in place to have the parser automatically skip whitespace it encounters. Let’s write a test so we know when we get it working:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;   &#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
-</span><span class=s>Root@0..3
-</span><span class=s>  Whitespace@0..3 &#34;   &#34;&#34;#</span><span class=p>]],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>All the functions that interact with <code>lexemes</code> need to skip past any whitespace they find. Note that we don’t add events for whitespace; instead, we just ignore it and let the sink take care of it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_whitespace</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>text</span>: <span class=nc>text</span><span class=p>.</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_whitespace</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_raw</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_whitespace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_raw</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek_raw</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>To make this work we need to update the sink to automatically add any whitespace it encounters. Let’s start by adding a cursor to the sink:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span><span class=o>&lt;</span><span class=nb>&#39;static</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w>
-</span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w> </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>builder</span>: <span class=nc>GreenNodeBuilder</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>            </span><span class=n>lexemes</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>cursor</span>: <span class=mi>0</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s bump this cursor every time a token is added:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>EldiroLanguage</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>,</span><span class=w> </span><span class=n>SmolStr</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>                </span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=p>),</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>token</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>text</span>: <span class=nc>SmolStr</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>),</span><span class=w> </span><span class=n>text</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This gives us a compiler error:</p><pre tabindex=0><code class=language-- data-lang=->error[E0382]: borrow of partially moved value: `self`
+</code></pre><p>Let’s abstract away the combination of <code>SyntaxKind</code> and <code>&str</code> into its own structure, since the two are frequently being passed together (something called a <a href="https://youtu.be/DC-pQPq0acs?t=521">data clump</a>):</p><pre><code class=language-rust>// lexer.rs
+
+impl&lt;'a&gt; Iterator for Lexer&lt;'a&gt; {
+    type Item = Lexeme&lt;'a&gt;;
+
+    fn next(&amp;mut self) -&gt; Option&lt;Self::Item&gt; {
+        let kind = self.inner.next()?;
+        let text = self.inner.slice();
+
+        Some(Self::Item { kind, text })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) struct Lexeme&lt;'a&gt; {
+    pub(crate) kind: SyntaxKind,
+    pub(crate) text: &amp;'a str,
+}
+
+// snip
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    fn check(input: &amp;str, kind: SyntaxKind) {
+        let mut lexer = Lexer::new(input);
+        assert_eq!(lexer.next(), Some(Lexeme { kind, text: input }));
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-rust>// parser.rs
+
+use crate::lexer::{Lexeme, Lexer, SyntaxKind};
+use crate::syntax::SyntaxNode;
+use event::Event;
+use expr::expr;
+use rowan::GreenNode;
+use sink::Sink;
+
+// snip
+
+struct Parser&lt;'l, 'input&gt; {
+    lexemes: &amp;'l [Lexeme&lt;'input&gt;],
+    cursor: usize,
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'l, 'input&gt; Parser&lt;'l, 'input&gt; {
+    fn new(lexemes: &amp;'l [Lexeme&lt;'input&gt;]) -&gt; Self {
+        Self {
+            lexemes,
+            cursor: 0,
+            events: Vec::new(),
+        }
+    }
+
+    // snip
+
+    fn bump(&amp;mut self) {
+        let Lexeme { kind, text } = self.lexemes[self.cursor];
+
+        self.cursor += 1;
+        self.events.push(Event::AddToken {
+            kind,
+            text: text.into(),
+        });
+    }
+
+    // snip
+
+    fn peek(&amp;self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.lexemes
+            .get(self.cursor)
+            .map(|Lexeme { kind, .. }| *kind)
+    }
+}
+</code></pre><pre><code class=language-rust>// sink.rs
+
+use super::event::Event;
+use crate::lexer::Lexeme;
+use crate::syntax::EldiroLanguage;
+use rowan::{GreenNode, GreenNodeBuilder, Language};
+
+pub(super) struct Sink&lt;'l, 'input&gt; {
+    builder: GreenNodeBuilder&lt;'static&gt;,
+    lexemes: &amp;'l [Lexeme&lt;'input&gt;],
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    pub(super) fn new(lexemes: &amp;'l [Lexeme&lt;'input&gt;], events: Vec&lt;Event&gt;) -&gt; Self {
+        Self {
+            builder: GreenNodeBuilder::new(),
+            lexemes,
+            events,
+        }
+    }
+
+    // snip
+}
+</code></pre><h1 id=implementation-of-whitespace-skipping>Implementation of whitespace-skipping</h1><p>Now the machinery is in place to have the parser automatically skip whitespace it encounters. Let’s write a test so we know when we get it working:</p><pre><code class=language-rust>// parser.rs
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_whitespace() {
+        check(
+            &quot;   &quot;,
+            expect![[r#&quot;
+Root@0..3
+  Whitespace@0..3 &quot;   &quot;&quot;#]],
+        );
+    }
+}
+</code></pre><p>All the functions that interact with <code>lexemes</code> need to skip past any whitespace they find. Note that we don’t add events for whitespace; instead, we just ignore it and let the sink take care of it:</p><pre><code class=language-rust>impl&lt;'l, 'input&gt; Parser&lt;'l, 'input&gt; {
+    // snip
+
+    fn bump(&amp;mut self) {
+        self.eat_whitespace();
+
+        let Lexeme { kind, text } = self.lexemes[self.cursor];
+
+        self.cursor += 1;
+        self.events.push(Event::AddToken {
+            kind,
+            text: text.into(),
+        });
+    }
+
+    // snip
+
+    fn peek(&amp;mut self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.eat_whitespace();
+        self.peek_raw()
+    }
+
+    fn eat_whitespace(&amp;mut self) {
+        while self.peek_raw() == Some(SyntaxKind::Whitespace) {
+            self.cursor += 1;
+        }
+    }
+
+    fn peek_raw(&amp;self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.lexemes
+            .get(self.cursor)
+            .map(|Lexeme { kind, .. }| *kind)
+    }
+}
+</code></pre><p>To make this work we need to update the sink to automatically add any whitespace it encounters. Let’s start by adding a cursor to the sink:</p><pre><code class=language-rust>// sink.rs
+
+pub(super) struct Sink&lt;'l, 'input&gt; {
+    builder: GreenNodeBuilder&lt;'static&gt;,
+    lexemes: &amp;'l [Lexeme&lt;'input&gt;],
+    cursor: usize,
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    pub(super) fn new(lexemes: &amp;'l [Lexeme&lt;'input&gt;], events: Vec&lt;Event&gt;) -&gt; Self {
+        Self {
+            builder: GreenNodeBuilder::new(),
+            lexemes,
+            cursor: 0,
+            events,
+        }
+    }
+
+    // snip
+}
+</code></pre><p>Let’s bump this cursor every time a token is added:</p><pre><code class=language-rust>use super::event::Event;
+use crate::lexer::{Lexeme, SyntaxKind};
+use crate::syntax::EldiroLanguage;
+use rowan::{GreenNode, GreenNodeBuilder, Language, SmolStr};
+
+// snip
+
+impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    // snip
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        // snip
+
+        for event in reordered_events {
+            match event {
+                // snip
+                Event::AddToken { kind, text } =&gt; self.token(kind, text),
+                // snip
+            }
+        }
+
+        // snip
+    }
+
+    fn token(&amp;mut self, kind: SyntaxKind, text: SmolStr) {
+        self.builder.token(EldiroLanguage::kind_to_raw(kind), text);
+        self.cursor += 1;
+    }
+}
+</code></pre><p>This gives us a compiler error:</p><pre><code class=language-->error[E0382]: borrow of partially moved value: `self`
    --&gt; crates/eldiro/src/parser/sink.rs:39:51
     |
 26  |         for (idx, event) in self.events.into_iter().enumerate() {
@@ -539,226 +541,226 @@ note: this function consumes the receiver `self` by taking ownership of it, whic
 232 |     fn into_iter(self) -&gt; Self::IntoIter;
     |                  ^^^^
     = note: partial move occurs because `self.events` has type `Vec&lt;Event&gt;`, which does not implement the `Copy` trait
-</code></pre><p>We can appease the borrow checker by replacing the <code>.into_iter()</code> call with <code>.iter()</code> and sprinkling in a few <code>*</code>s here and there:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=p>(</span><span class=n>idx</span><span class=p>,</span><span class=w> </span><span class=n>event</span><span class=p>)</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>iter</span><span class=p>().</span><span class=n>enumerate</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNodeAt</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>checkpoint</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=n>reordered_events</span><span class=p>.</span><span class=n>remove</span><span class=p>(</span><span class=n>idx</span><span class=p>);</span><span class=w>
-</span><span class=w>                </span><span class=n>reordered_events</span><span class=p>.</span><span class=n>insert</span><span class=p>(</span><span class=o>*</span><span class=n>checkpoint</span><span class=p>,</span><span class=w> </span><span class=n>Event</span>::<span class=n>StartNode</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span>: <span class=o>*</span><span class=n>kind</span><span class=w> </span><span class=p>});</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that Eldiro is compiling, we can finally get to the interesting part: whitespace skipping. Let’s implement an <code>eat_whitespace</code> method and call it after processing each event:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>finish</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>GreenNode</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=k>for</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=k>in</span><span class=w> </span><span class=n>reordered_events</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>match</span><span class=w> </span><span class=n>event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_whitespace</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_whitespace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>lexeme</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=n>lexeme</span><span class=p>.</span><span class=n>kind</span><span class=w> </span><span class=o>!=</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=k>break</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>lexeme</span><span class=p>.</span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>lexeme</span><span class=p>.</span><span class=n>text</span><span class=p>.</span><span class=n>into</span><span class=p>());</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>We can appease the borrow checker by replacing the <code>.into_iter()</code> call with <code>.iter()</code> and sprinkling in a few <code>*</code>s here and there:</p><pre><code class=language-rust>impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    // snip
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        // snip
+
+        for (idx, event) in self.events.iter().enumerate() {
+            if let Event::StartNodeAt { kind, checkpoint } = event {
+                reordered_events.remove(idx);
+                reordered_events.insert(*checkpoint, Event::StartNode { kind: *kind });
+            }
+        }
+
+        // snip
+    }
+
+    // snip
+}
+</code></pre><p>Now that Eldiro is compiling, we can finally get to the interesting part: whitespace skipping. Let’s implement an <code>eat_whitespace</code> method and call it after processing each event:</p><pre><code class=language-rust>impl&lt;'l, 'input&gt; Sink&lt;'l, 'input&gt; {
+    // snip
+
+    pub(super) fn finish(mut self) -&gt; GreenNode {
+        // snip
+
+        for event in reordered_events {
+            match event {
+                // snip
+            }
+
+            self.eat_whitespace();
+        }
+
+        // snip
+    }
+
+    fn eat_whitespace(&amp;mut self) {
+        while let Some(lexeme) = self.lexemes.get(self.cursor) {
+            if lexeme.kind != SyntaxKind::Whitespace {
+                break;
+            }
+
+            self.token(lexeme.kind, lexeme.text.into());
+        }
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 28 tests
 ............................
 test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>We should write some tests for parsing numbers surrounded by whitespace on different sides, since the only test we currently have related to whitespace only contains whitespace, and nothing else:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_number_preceded_by_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;   9876&#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
-</span><span class=s>Root@0..7
-</span><span class=s>  Whitespace@0..3 &#34;   &#34;
-</span><span class=s>  Number@3..7 &#34;9876&#34;&#34;#</span><span class=p>]],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_number_followed_by_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34;999   &#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
-</span><span class=s>Root@0..6
-</span><span class=s>  Number@0..3 &#34;999&#34;
-</span><span class=s>  Whitespace@3..6 &#34;   &#34;&#34;#</span><span class=p>]],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_number_surrounded_by_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34; 123     &#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
-</span><span class=s>Root@0..9
-</span><span class=s>  Whitespace@0..1 &#34; &#34;
-</span><span class=s>  Number@1..4 &#34;123&#34;
-</span><span class=s>  Whitespace@4..9 &#34;     &#34;&#34;#</span><span class=p>]],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>We should write some tests for parsing numbers surrounded by whitespace on different sides, since the only test we currently have related to whitespace only contains whitespace, and nothing else:</p><pre><code class=language-rust>// expr.rs
+
+#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_number_preceded_by_whitespace() {
+        check(
+            &quot;   9876&quot;,
+            expect![[r#&quot;
+Root@0..7
+  Whitespace@0..3 &quot;   &quot;
+  Number@3..7 &quot;9876&quot;&quot;#]],
+        );
+    }
+
+    #[test]
+    fn parse_number_followed_by_whitespace() {
+        check(
+            &quot;999   &quot;,
+            expect![[r#&quot;
+Root@0..6
+  Number@0..3 &quot;999&quot;
+  Whitespace@3..6 &quot;   &quot;&quot;#]],
+        );
+    }
+
+    #[test]
+    fn parse_number_surrounded_by_whitespace() {
+        check(
+            &quot; 123     &quot;,
+            expect![[r#&quot;
+Root@0..9
+  Whitespace@0..1 &quot; &quot;
+  Number@1..4 &quot;123&quot;
+  Whitespace@4..9 &quot;     &quot;&quot;#]],
+        );
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 31 tests
 ...............................
 test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Let’s write one more test to make sure whitespace in binary expressions is working:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=cp>#[test]</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>parse_binary_expression_with_whitespace</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>check</span><span class=p>(</span><span class=w>
-</span><span class=w>            </span><span class=s>&#34; 1 +   2* 3 &#34;</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>expect</span><span class=o>!</span><span class=p>[[</span><span class=s>r#&#34;
-</span><span class=s>Root@0..12
-</span><span class=s>  Whitespace@0..1 &#34; &#34;
-</span><span class=s>  BinaryExpr@1..12
-</span><span class=s>    Number@1..2 &#34;1&#34;
-</span><span class=s>    Whitespace@2..3 &#34; &#34;
-</span><span class=s>    Plus@3..4 &#34;+&#34;
-</span><span class=s>    Whitespace@4..7 &#34;   &#34;
-</span><span class=s>    BinaryExpr@7..12
-</span><span class=s>      Number@7..8 &#34;2&#34;
-</span><span class=s>      Star@8..9 &#34;*&#34;
-</span><span class=s>      Whitespace@9..10 &#34; &#34;
-</span><span class=s>      Number@10..11 &#34;3&#34;
-</span><span class=s>      Whitespace@11..12 &#34; &#34;&#34;#</span><span class=p>]],</span><span class=w>
-</span><span class=w>        </span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Let’s write one more test to make sure whitespace in binary expressions is working:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    // snip
+
+    #[test]
+    fn parse_binary_expression_with_whitespace() {
+        check(
+            &quot; 1 +   2* 3 &quot;,
+            expect![[r#&quot;
+Root@0..12
+  Whitespace@0..1 &quot; &quot;
+  BinaryExpr@1..12
+    Number@1..2 &quot;1&quot;
+    Whitespace@2..3 &quot; &quot;
+    Plus@3..4 &quot;+&quot;
+    Whitespace@4..7 &quot;   &quot;
+    BinaryExpr@7..12
+      Number@7..8 &quot;2&quot;
+      Star@8..9 &quot;*&quot;
+      Whitespace@9..10 &quot; &quot;
+      Number@10..11 &quot;3&quot;
+      Whitespace@11..12 &quot; &quot;&quot;#]],
+        );
+    }
+
+    // snip
+}
+</code></pre><pre><code class=language-->$ cargo t -q
 running 32 tests
 ................................
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>Cool! And there you have it: we’ve managed to implement automatic whitespace skipping without having to touch the actual parser’s code, only the helper methods and sink.</p><h1 id=refactoring>Refactoring</h1><p>It’s ugly how the parser has to manage a cursor that it has to manually advance through the input, skipping whitespace as necessary. Instead, we should extract this into another type; let’s call it <code>Source</code> to stay consistent with <code>Sink</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// src/parser/source.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=n>Lexeme</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>],</span><span class=w>
-</span><span class=w>    </span><span class=n>cursor</span>: <span class=kt>usize</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s update <code>Parser</code> to use <code>Source</code> with the API we wish we had; this way we avoid the common pitfall of writing an API, trying to use it, only to find that it needs to be changed:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>source</span>: <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>source</span>: <span class=nc>Source</span>::<span class=n>new</span><span class=p>(</span><span class=n>lexemes</span><span class=p>),</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>source</span><span class=p>.</span><span class=n>next_lexeme</span><span class=p>().</span><span class=n>unwrap</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=p>.</span><span class=n>push</span><span class=p>(</span><span class=n>Event</span>::<span class=n>AddToken</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>kind</span>: <span class=o>*</span><span class=n>kind</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>text</span>: <span class=p>(</span><span class=o>*</span><span class=n>text</span><span class=p>).</span><span class=n>into</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>});</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>source</span><span class=p>.</span><span class=n>peek_kind</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>We’ve removed the <code>lexemes</code> and <code>cursor</code> fields and their references from <code>Parser</code>. These have been replaced by calls to methods on <code>Source</code>, plus a few minor changes that these modifications require. Let’s implement the missing methods on <code>Source</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexeme</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Source</span><span class=o>&lt;</span><span class=na>&#39;l</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>lexemes</span>: <span class=kp>&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=p>[</span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>lexemes</span><span class=p>,</span><span class=w> </span><span class=n>cursor</span>: <span class=mi>0</span><span class=w> </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>next_lexeme</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;&amp;</span><span class=na>&#39;l</span><span class=w> </span><span class=n>Lexeme</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_whitespace</span><span class=p>();</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>lexeme</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=nb>Some</span><span class=p>(</span><span class=n>lexeme</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>peek_kind</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>eat_whitespace</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_kind_raw</span><span class=p>()</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_whitespace</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>peek_kind_raw</span><span class=p>()</span><span class=w> </span><span class=o>==</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>SyntaxKind</span>::<span class=n>Whitespace</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek_kind_raw</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>lexemes</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Lexeme</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=o>*</span><span class=n>kind</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>The code here is almost identical to that of <code>Parser</code>’s helper methods prior to the change we made to them just a moment ago.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q
+</code></pre><p>Cool! And there you have it: we’ve managed to implement automatic whitespace skipping without having to touch the actual parser’s code, only the helper methods and sink.</p><h1 id=refactoring>Refactoring</h1><p>It’s ugly how the parser has to manage a cursor that it has to manually advance through the input, skipping whitespace as necessary. Instead, we should extract this into another type; let’s call it <code>Source</code> to stay consistent with <code>Sink</code>:</p><pre><code class=language-rust>// parser.rs
+
+mod event;
+mod expr;
+mod sink;
+mod source;
+
+use crate::lexer::{Lexeme, Lexer, SyntaxKind};
+use crate::syntax::SyntaxNode;
+use event::Event;
+use expr::expr;
+use rowan::GreenNode;
+use sink::Sink;
+use source::Source;
+</code></pre><pre><code class=language-rust>// src/parser/source.rs
+
+use crate::lexer::Lexeme;
+
+pub(super) struct Source&lt;'l, 'input&gt; {
+    lexemes: &amp;'l [Lexeme&lt;'input&gt;],
+    cursor: usize,
+}
+</code></pre><p>Let’s update <code>Parser</code> to use <code>Source</code> with the API we wish we had; this way we avoid the common pitfall of writing an API, trying to use it, only to find that it needs to be changed:</p><pre><code class=language-rust>// parser.rs
+
+struct Parser&lt;'l, 'input&gt; {
+    source: Source&lt;'l, 'input&gt;,
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'l, 'input&gt; Parser&lt;'l, 'input&gt; {
+    fn new(lexemes: &amp;'l [Lexeme&lt;'input&gt;]) -&gt; Self {
+        Self {
+            source: Source::new(lexemes),
+            events: Vec::new(),
+        }
+    }
+
+    // snip
+
+    fn bump(&amp;mut self) {
+        let Lexeme { kind, text } = self.source.next_lexeme().unwrap();
+
+        self.events.push(Event::AddToken {
+            kind: *kind,
+            text: (*text).into(),
+        });
+    }
+
+    // snip
+
+    fn peek(&amp;mut self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.source.peek_kind()
+    }
+}
+</code></pre><p>We’ve removed the <code>lexemes</code> and <code>cursor</code> fields and their references from <code>Parser</code>. These have been replaced by calls to methods on <code>Source</code>, plus a few minor changes that these modifications require. Let’s implement the missing methods on <code>Source</code>:</p><pre><code class=language-rust>// source.rs
+
+use crate::lexer::{Lexeme, SyntaxKind};
+
+// snip
+
+impl&lt;'l, 'input&gt; Source&lt;'l, 'input&gt; {
+    pub(super) fn new(lexemes: &amp;'l [Lexeme&lt;'input&gt;]) -&gt; Self {
+        Self { lexemes, cursor: 0 }
+    }
+
+    pub(super) fn next_lexeme(&amp;mut self) -&gt; Option&lt;&amp;'l Lexeme&lt;'input&gt;&gt; {
+        self.eat_whitespace();
+
+        let lexeme = self.lexemes.get(self.cursor)?;
+        self.cursor += 1;
+
+        Some(lexeme)
+    }
+
+    pub(super) fn peek_kind(&amp;mut self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.eat_whitespace();
+        self.peek_kind_raw()
+    }
+
+    fn eat_whitespace(&amp;mut self) {
+        while self.peek_kind_raw() == Some(SyntaxKind::Whitespace) {
+            self.cursor += 1;
+        }
+    }
+
+    fn peek_kind_raw(&amp;self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.lexemes
+            .get(self.cursor)
+            .map(|Lexeme { kind, .. }| *kind)
+    }
+}
+</code></pre><p>The code here is almost identical to that of <code>Parser</code>’s helper methods prior to the change we made to them just a moment ago.</p><pre><code class=language-->$ cargo t -q
 running 32 tests
 ................................
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

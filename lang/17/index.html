@@ -1,242 +1,244 @@
-<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Seventeen: Crates · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.b763c3746f235d1e84e23bc1b3d94a46534216d5bbae8ce5b8ae93e8c0816df3.css integrity="sha256-t2PDdG8jXR6E4jvBs9lKRlNCFtW7rozluK6T6MCBbfM="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Part Seventeen: Crates · arzg’s website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.04c23afe51262a10ee61829da41f4d7318ff311ed0d0bcbf1db0fde96e3830f4.css integrity="sha256-BMI6/lEmKhDuYYKdpB9Ncxj/MR7Q0Ly/HbD96W44MPQ="><script src=https://unpkg.com/quicklink@2.0.0/dist/quicklink.umd.js></script>
 <script src=https://unpkg.com/anchor-js@4.3.1/anchor.min.js></script>
-<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Seventeen: Crates</h1><section class=page-info><ul><li>18 December 2020</li><li>1393 words</li><li>seven minute read</li></ul></section></header><main><p>I’m not a fan of how, currently, all the submodules of <code>crate::parser</code> can access the internals of our parser. This access makes sense for <code>marker.rs</code>, but not for, say, <code>expr.rs</code>. These other modules should have to go through the parser’s API. We can enforce these sorts of visibility issues by breaking our project up into crates.</p><h1 id=extracting-the-lexer>Extracting the lexer</h1><p>The first part of Eldiro we’ll create a separate crate for is the lexer.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo new --lib crates/lexer
+<script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script>
+<script>window.onload=()=>{quicklink.listen()},document.addEventListener("DOMContentLoaded",function(a){anchors.add("main h1")})</script><link rel=apple-touch-icon sizes=180x180 href=/apple-touch-icon.png><link rel=icon type=image/png sizes=32x32 href=/favicon-32x32.png><link rel=icon type=image/png sizes=16x16 href=/favicon-16x16.png><link rel=manifest href=/site.webmanifest></head><body><nav class=site-navigation><ul><li><a href=/>Home</a></li><li><a href=/blog/>Blog</a></li><li class=current><a href=/lang/>Make A Language</a></li></ul></nav><header class=header-area><h1 class=title>Part Seventeen: Crates</h1><section class=page-info><ul><li>18 December 2020</li><li>2057 words</li><li>ten minute read</li></ul></section></header><main><p>I’m not a fan of how, currently, all the submodules of <code>crate::parser</code> can access the internals of our parser. This access makes sense for <code>marker.rs</code>, but not for, say, <code>expr.rs</code>. These other modules should have to go through the parser’s API. We can enforce these sorts of visibility issues by breaking our project up into crates.</p><h1 id=extracting-the-lexer>Extracting the lexer</h1><p>The first part of Eldiro we’ll create a separate crate for is the lexer.</p><pre><code class=language-->$ cargo new --lib crates/lexer
      Created library `crates/lexer` package
 $ git mv -f crates/{eldiro/src/lexer.rs,lexer/src/lib.rs}
-</code></pre><p>We also need to transfer the Logos dependency from <code>eldiro</code>’s <code>Cargo.toml</code> to <code>lexer</code>’s:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+</code></pre><p>We also need to transfer the Logos dependency from <code>eldiro</code>’s <code>Cargo.toml</code> to <code>lexer</code>’s:</p><pre><code class=language-toml># crates/eldiro/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
-<span class=nx>num-derive</span> <span class=p>=</span> <span class=s2>&#34;0.3.3&#34;</span>
-<span class=nx>num-traits</span> <span class=p>=</span> <span class=s2>&#34;0.2.14&#34;</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
-</code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/lexer/Cargo.toml</span>
+[dependencies]
+drop_bomb = &quot;0.1.5&quot;
+num-derive = &quot;0.3.3&quot;
+num-traits = &quot;0.2.14&quot;
+rowan = &quot;0.10.0&quot;
+</code></pre><pre><code class=language-toml># crates/lexer/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>logos</span> <span class=p>=</span> <span class=s2>&#34;0.11.4&#34;</span>
-</code></pre></div><p><code>crates/eldiro/src/lib.rs</code> is still referring to the <code>lexer</code> module; let’s remove it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>syntax</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Since naming should show that the lexer is separate from the syntax tree, rename <code>lexer::SyntaxKind</code> to <code>TokenKind</code>. We should remove the node types from <code>TokenKind</code> for the same reason:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>logos</span>::<span class=n>Logos</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>TokenKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;[ </span><span class=se>\n</span><span class=s>]+&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Whitespace</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;fn&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>FnKw</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;let&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>LetKw</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;[A-Za-z][A-Za-z0-9]*&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Ident</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;[0-9]+&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Number</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;+&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Plus</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;-&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Minus</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;*&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Star</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;/&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Slash</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;=&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Equals</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;(&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>LParen</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;)&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>RParen</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;{&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>LBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[token(</span><span class=s>&#34;}&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>RBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[regex(</span><span class=s>&#34;#.*&#34;</span><span class=cp>)]</span><span class=w>
-</span><span class=w>    </span><span class=n>Comment</span><span class=p>,</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=cp>#[error]</span><span class=w>
-</span><span class=w>    </span><span class=n>Error</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Delete <code>TokenKind::is_trivia</code>, since the lexer should know nothing about parsing (which trivia certainly is a part of). To allow other code to use our lexer, replace all occurrences of <code>pub(crate)</code> with <code>pub</code> in <code>crates/lexer/src/lib.rs</code>.</p><p>Let’s move <code>TokenKind</code>-related code into a separate module, as <code>lib.rs</code> is starting to get cluttered:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>mod</span> <span class=nn>token_kind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>token_kind</span>::<span class=n>TokenKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/lexer/src/token_kind.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>logos</span>::<span class=n>Logos</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, Logos)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>enum</span> <span class=nc>TokenKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=p>{</span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>Token</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now that that’s done we should make <code>eldiro</code> depend on <code>lexer</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+[dependencies]
+logos = &quot;0.11.4&quot;
+</code></pre><p><code>crates/eldiro/src/lib.rs</code> is still referring to the <code>lexer</code> module; let’s remove it:</p><pre><code class=language-rust>pub mod parser;
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>num-derive</span> <span class=p>=</span> <span class=s2>&#34;0.3.3&#34;</span>
-<span class=nx>num-traits</span> <span class=p>=</span> <span class=s2>&#34;0.2.14&#34;</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
-</code></pre></div><p>Run a project-wide search and replace from <code>crate::lexer</code> to <code>lexer</code>; this will replace all references to the now-deleted <code>lexer</code> module with ones to the new <code>lexer</code> crate.</p><p>Let’s define <code>SyntaxKind</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// syntax.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>TokenKind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>num_derive</span>::<span class=p>{</span><span class=n>FromPrimitive</span><span class=p>,</span><span class=w> </span><span class=n>ToPrimitive</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>num_traits</span>::<span class=p>{</span><span class=n>FromPrimitive</span><span class=p>,</span><span class=w> </span><span class=n>ToPrimitive</span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive, ToPrimitive)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>Whitespace</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>FnKw</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>LetKw</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Ident</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Number</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Plus</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Minus</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Star</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Slash</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Equals</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>LParen</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>RParen</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>LBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>RBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Comment</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Error</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Root</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>InfixExpr</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>Literal</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>ParenExpr</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>PrefixExpr</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>VariableRef</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>is_trivia</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span> <span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>matches</span><span class=o>!</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Self</span>::<span class=n>Whitespace</span><span class=w> </span><span class=o>|</span><span class=w> </span><span class=n>Self</span>::<span class=n>Comment</span><span class=p>)</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=nb>From</span><span class=o>&lt;</span><span class=n>TokenKind</span><span class=o>&gt;</span><span class=w> </span><span class=k>for</span><span class=w> </span><span class=n>SyntaxKind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>from</span><span class=p>(</span><span class=n>token_kind</span>: <span class=nc>TokenKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>match</span><span class=w> </span><span class=n>token_kind</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Whitespace</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Whitespace</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>FnKw</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>FnKw</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>LetKw</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>LetKw</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Ident</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Ident</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Number</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Number</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Plus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Plus</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Minus</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Minus</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Star</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Star</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Slash</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Slash</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Equals</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Equals</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>LParen</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>LParen</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>RParen</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>RParen</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>LBrace</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>LBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>RBrace</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>RBrace</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Comment</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Comment</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>TokenKind</span>::<span class=n>Error</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=n>Self</span>::<span class=n>Error</span><span class=p>,</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Note how we define a conversion from <code>lexer</code>’s <code>TokenKind</code> to <code>SyntaxKind</code>. The next step is to import <code>SyntaxKind</code> from <code>crate::syntax</code> instead of <code>lexer</code>, making sure to add any conversions where necessary:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=p>{</span><span class=n>SyntaxKind</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxNode</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=p>{</span><span class=n>Lexer</span><span class=p>,</span><span class=w> </span><span class=n>Token</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// event.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[derive(Debug, PartialEq)]</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>enum</span> <span class=nc>Event</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>drop_bomb</span>::<span class=n>DropBomb</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// sink.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=p>{</span><span class=n>EldiroLanguage</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=p>{</span><span class=n>GreenNode</span><span class=p>,</span><span class=w> </span><span class=n>GreenNodeBuilder</span><span class=p>,</span><span class=w> </span><span class=n>Language</span><span class=p>};</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>mem</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Sink</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>eat_trivia</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=k>while</span><span class=w> </span><span class=kd>let</span><span class=w> </span><span class=nb>Some</span><span class=p>(</span><span class=n>token</span><span class=p>)</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>if</span><span class=w> </span><span class=o>!</span><span class=n>SyntaxKind</span>::<span class=n>from</span><span class=p>(</span><span class=n>token</span><span class=p>.</span><span class=n>kind</span><span class=p>).</span><span class=n>is_trivia</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>                </span><span class=k>break</span><span class=p>;</span><span class=w>
-</span><span class=w>            </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>            </span><span class=bp>self</span><span class=p>.</span><span class=n>token</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>token</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>Token</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=n>text</span><span class=w> </span><span class=p>}</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=p>[</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>];</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>builder</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>token</span><span class=p>(</span><span class=n>EldiroLanguage</span>::<span class=n>kind_to_raw</span><span class=p>(</span><span class=n>kind</span><span class=p>.</span><span class=n>into</span><span class=p>()),</span><span class=w> </span><span class=n>text</span><span class=p>.</span><span class=n>into</span><span class=p>());</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=w> </span><span class=o>+=</span><span class=w> </span><span class=mi>1</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// source.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Source</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>fn</span> <span class=nf>peek_kind_raw</span><span class=p>(</span><span class=o>&amp;</span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>tokens</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>get</span><span class=p>(</span><span class=bp>self</span><span class=p>.</span><span class=n>cursor</span><span class=p>)</span><span class=w>
-</span><span class=w>            </span><span class=p>.</span><span class=n>map</span><span class=p>(</span><span class=o>|</span><span class=n>Token</span><span class=w> </span><span class=p>{</span><span class=w> </span><span class=n>kind</span><span class=p>,</span><span class=w> </span><span class=p>..</span><span class=w> </span><span class=p>}</span><span class=o>|</span><span class=w> </span><span class=p>(</span><span class=o>*</span><span class=n>kind</span><span class=p>).</span><span class=n>into</span><span class=p>())</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Running our tests shows how they’re split across crates:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
+mod syntax;
+</code></pre><p>Since naming should show that the lexer is separate from the syntax tree, rename <code>lexer::SyntaxKind</code> to <code>TokenKind</code>. We should remove the node types from <code>TokenKind</code> for the same reason:</p><pre><code class=language-rust>// crates/lexer/src/lib.rs
+
+use logos::Logos;
+
+// snip
+
+#[derive(Debug, Copy, Clone, PartialEq, Logos)]
+pub(crate) enum TokenKind {
+    #[regex(&quot;[ \n]+&quot;)]
+    Whitespace,
+
+    #[token(&quot;fn&quot;)]
+    FnKw,
+
+    #[token(&quot;let&quot;)]
+    LetKw,
+
+    #[regex(&quot;[A-Za-z][A-Za-z0-9]*&quot;)]
+    Ident,
+
+    #[regex(&quot;[0-9]+&quot;)]
+    Number,
+
+    #[token(&quot;+&quot;)]
+    Plus,
+
+    #[token(&quot;-&quot;)]
+    Minus,
+
+    #[token(&quot;*&quot;)]
+    Star,
+
+    #[token(&quot;/&quot;)]
+    Slash,
+
+    #[token(&quot;=&quot;)]
+    Equals,
+
+    #[token(&quot;(&quot;)]
+    LParen,
+
+    #[token(&quot;)&quot;)]
+    RParen,
+
+    #[token(&quot;{&quot;)]
+    LBrace,
+
+    #[token(&quot;}&quot;)]
+    RBrace,
+
+    #[regex(&quot;#.*&quot;)]
+    Comment,
+
+    #[error]
+    Error,
+}
+</code></pre><p>Delete <code>TokenKind::is_trivia</code>, since the lexer should know nothing about parsing (which trivia certainly is a part of). To allow other code to use our lexer, replace all occurrences of <code>pub(crate)</code> with <code>pub</code> in <code>crates/lexer/src/lib.rs</code>.</p><p>Let’s move <code>TokenKind</code>-related code into a separate module, as <code>lib.rs</code> is starting to get cluttered:</p><pre><code class=language-rust>mod token_kind;
+pub use token_kind::TokenKind;
+</code></pre><pre><code class=language-rust>// crates/lexer/src/token_kind.rs
+
+use logos::Logos;
+
+#[derive(Debug, Copy, Clone, PartialEq, Logos)]
+pub enum TokenKind {
+    // snip
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{Lexer, Token};
+
+    // snip
+}
+</code></pre><p>Now that that’s done we should make <code>eldiro</code> depend on <code>lexer</code>:</p><pre><code class=language-toml># crates/eldiro/Cargo.toml
+
+[dependencies]
+drop_bomb = &quot;0.1.5&quot;
+lexer = {path = &quot;../lexer&quot;}
+num-derive = &quot;0.3.3&quot;
+num-traits = &quot;0.2.14&quot;
+rowan = &quot;0.10.0&quot;
+</code></pre><p>Run a project-wide search and replace from <code>crate::lexer</code> to <code>lexer</code>; this will replace all references to the now-deleted <code>lexer</code> module with ones to the new <code>lexer</code> crate.</p><p>Let’s define <code>SyntaxKind</code>:</p><pre><code class=language-rust>// syntax.rs
+
+use lexer::TokenKind;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
+
+#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive, ToPrimitive)]
+pub(crate) enum SyntaxKind {
+    Whitespace,
+    FnKw,
+    LetKw,
+    Ident,
+    Number,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Equals,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    Comment,
+    Error,
+    Root,
+    InfixExpr,
+    Literal,
+    ParenExpr,
+    PrefixExpr,
+    VariableRef,
+}
+
+impl SyntaxKind {
+    pub(crate) fn is_trivia(self) -&gt; bool {
+        matches!(self, Self::Whitespace | Self::Comment)
+    }
+}
+
+impl From&lt;TokenKind&gt; for SyntaxKind {
+    fn from(token_kind: TokenKind) -&gt; Self {
+        match token_kind {
+            TokenKind::Whitespace =&gt; Self::Whitespace,
+            TokenKind::FnKw =&gt; Self::FnKw,
+            TokenKind::LetKw =&gt; Self::LetKw,
+            TokenKind::Ident =&gt; Self::Ident,
+            TokenKind::Number =&gt; Self::Number,
+            TokenKind::Plus =&gt; Self::Plus,
+            TokenKind::Minus =&gt; Self::Minus,
+            TokenKind::Star =&gt; Self::Star,
+            TokenKind::Slash =&gt; Self::Slash,
+            TokenKind::Equals =&gt; Self::Equals,
+            TokenKind::LParen =&gt; Self::LParen,
+            TokenKind::RParen =&gt; Self::RParen,
+            TokenKind::LBrace =&gt; Self::LBrace,
+            TokenKind::RBrace =&gt; Self::RBrace,
+            TokenKind::Comment =&gt; Self::Comment,
+            TokenKind::Error =&gt; Self::Error,
+        }
+    }
+}
+</code></pre><p>Note how we define a conversion from <code>lexer</code>’s <code>TokenKind</code> to <code>SyntaxKind</code>. The next step is to import <code>SyntaxKind</code> from <code>crate::syntax</code> instead of <code>lexer</code>, making sure to add any conversions where necessary:</p><pre><code class=language-rust>// parser.rs
+
+use crate::syntax::{SyntaxKind, SyntaxNode};
+use event::Event;
+use expr::expr;
+use lexer::{Lexer, Token};
+use marker::Marker;
+use rowan::GreenNode;
+use sink::Sink;
+use source::Source;
+</code></pre><pre><code class=language-rust>// event.rs
+
+use crate::syntax::SyntaxKind;
+
+#[derive(Debug, PartialEq)]
+pub(super) enum Event {
+    // snip
+}
+</code></pre><pre><code class=language-rust>// expr.rs
+
+use super::marker::CompletedMarker;
+use super::Parser;
+use crate::syntax::SyntaxKind;
+</code></pre><pre><code class=language-rust>// marker.rs
+
+use super::event::Event;
+use super::Parser;
+use crate::syntax::SyntaxKind;
+use drop_bomb::DropBomb;
+</code></pre><pre><code class=language-rust>// sink.rs
+
+use super::event::Event;
+use crate::syntax::{EldiroLanguage, SyntaxKind};
+use lexer::Token;
+use rowan::{GreenNode, GreenNodeBuilder, Language};
+use std::mem;
+
+// snip
+
+impl&lt;'t, 'input&gt; Sink&lt;'t, 'input&gt; {
+    // snip
+
+    fn eat_trivia(&amp;mut self) {
+        while let Some(token) = self.tokens.get(self.cursor) {
+            if !SyntaxKind::from(token.kind).is_trivia() {
+                break;
+            }
+
+            self.token();
+        }
+    }
+
+    fn token(&amp;mut self) {
+        let Token { kind, text } = self.tokens[self.cursor];
+
+        self.builder
+            .token(EldiroLanguage::kind_to_raw(kind.into()), text.into());
+
+        self.cursor += 1;
+    }
+}
+</code></pre><pre><code class=language-rust>// source.rs
+
+use crate::syntax::SyntaxKind;
+use lexer::Token;
+
+// snip
+
+impl&lt;'t, 'input&gt; Source&lt;'t, 'input&gt; {
+    // snip
+
+    fn peek_kind_raw(&amp;self) -&gt; Option&lt;SyntaxKind&gt; {
+        self.tokens
+            .get(self.cursor)
+            .map(|Token { kind, .. }| (*kind).into())
+    }
+}
+</code></pre><p>Running our tests shows how they’re split across crates:</p><pre><code class=language-->$ cargo t -q --lib
 
 running 17 tests
 .................
@@ -246,25 +248,25 @@ test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 18 tests
 ..................
 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=extracting-syntax>Extracting <code>syntax</code></h1><p>Next up: the <code>syntax</code> module. Let’s again generate a new crate and copy over the module:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo new --lib crates/syntax
+</code></pre><h1 id=extracting-syntax>Extracting <code>syntax</code></h1><p>Next up: the <code>syntax</code> module. Let’s again generate a new crate and copy over the module:</p><pre><code class=language-->$ cargo new --lib crates/syntax
      Created library `crates/syntax` package
 $ git mv -f crates/{eldiro/src/syntax.rs,syntax/src/lib.rs}
-</code></pre><p>Let’s add all its dependencies:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/syntax/Cargo.toml</span>
+</code></pre><p>Let’s add all its dependencies:</p><pre><code class=language-toml># crates/syntax/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>num-derive</span> <span class=p>=</span> <span class=s2>&#34;0.3.3&#34;</span>
-<span class=nx>num-traits</span> <span class=p>=</span> <span class=s2>&#34;0.2.14&#34;</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
-</code></pre></div><p>We can now remove num-derive and num-traits from <code>eldiro</code>’s <code>Cargo.toml</code>, while also adding <code>syntax</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+[dependencies]
+lexer = {path = &quot;../lexer&quot;}
+num-derive = &quot;0.3.3&quot;
+num-traits = &quot;0.2.14&quot;
+rowan = &quot;0.10.0&quot;
+</code></pre><p>We can now remove num-derive and num-traits from <code>eldiro</code>’s <code>Cargo.toml</code>, while also adding <code>syntax</code>:</p><pre><code class=language-toml># crates/eldiro/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
-</code></pre></div><p>Search and replace <code>pub(crate)</code> with <code>pub</code> in <code>crates/syntax/src/lib.rs</code> to make all its items visible to the outside world.</p><p>We also need to remove the relevant <code>mod</code> declaration from <code>crates/eldiro/src/lib.rs</code>, which now looks like this:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Yet again, run a project-wide search and replace from <code>crate::syntax</code> to <code>syntax</code>.</p><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
+[dependencies]
+drop_bomb = &quot;0.1.5&quot;
+lexer = {path = &quot;../lexer&quot;}
+rowan = &quot;0.10.0&quot;
+syntax = {path = &quot;../syntax&quot;}
+</code></pre><p>Search and replace <code>pub(crate)</code> with <code>pub</code> in <code>crates/syntax/src/lib.rs</code> to make all its items visible to the outside world.</p><p>We also need to remove the relevant <code>mod</code> declaration from <code>crates/eldiro/src/lib.rs</code>, which now looks like this:</p><pre><code class=language-rust>pub mod parser;
+</code></pre><p>Yet again, run a project-wide search and replace from <code>crate::syntax</code> to <code>syntax</code>.</p><pre><code class=language-->$ cargo t -q --lib
 
 running 17 tests
 .................
@@ -274,294 +276,270 @@ test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 18 tests
 ..................
 test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=extracting-the-parser>Extracting the parser</h1><p>This is the last crate we’ll extract, so let’s get on with it:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo new --lib crates/parser
+</code></pre><h1 id=extracting-the-parser>Extracting the parser</h1><p>This is the last crate we’ll extract, so let’s get on with it:</p><pre><code class=language-->$ cargo new --lib crates/parser
      Created library `crates/parser` package
 $ git mv -f crates/{eldiro/src/parser.rs,parser/src/lib.rs}
 $ git mv -f crates/{eldiro/src/parser/*,parser/src}
 $ rmdir crates/eldiro/src/parser
-</code></pre><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/parser/Cargo.toml</span>
+</code></pre><pre><code class=language-toml># crates/parser/Cargo.toml
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>drop_bomb</span> <span class=p>=</span> <span class=s2>&#34;0.1.5&#34;</span>
-<span class=nx>lexer</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../lexer&#34;</span><span class=p>}</span>
-<span class=nx>rowan</span> <span class=p>=</span> <span class=s2>&#34;0.10.0&#34;</span>
-<span class=nx>syntax</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../syntax&#34;</span><span class=p>}</span>
+[dependencies]
+drop_bomb = &quot;0.1.5&quot;
+lexer = {path = &quot;../lexer&quot;}
+rowan = &quot;0.10.0&quot;
+syntax = {path = &quot;../syntax&quot;}
 
-<span class=p>[</span><span class=nx>dev-dependencies</span><span class=p>]</span>
-<span class=nx>expect-test</span> <span class=p>=</span> <span class=s2>&#34;1.0.1&#34;</span>
-</code></pre></div><p>Run a project-wide search and replace from <code>pub(super)</code> to <code>pub(crate)</code>, since all the occurrences of <code>pub(super)</code> are on items in top-level modules of the <code>parser</code> crate. As such, using <code>pub(super)</code> on these items is equivalent to <code>pub(crate)</code>, with <code>pub(crate)</code> being the more idiomatic choice.</p><p>To prevent all code in the <code>parser</code> crate from being able to see inside of <code>Parser</code>, we’ll move it into its own module.</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Lexer</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>green_node</span>: <span class=nc>GreenNode</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=w> </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>check</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>,</span><span class=w> </span><span class=n>expected_tree</span>: <span class=nc>expect_test</span>::<span class=n>Expect</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parse</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parse</span><span class=p>(</span><span class=n>input</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=n>expected_tree</span><span class=p>.</span><span class=n>assert_eq</span><span class=p>(</span><span class=o>&amp;</span><span class=n>parse</span><span class=p>.</span><span class=n>debug_tree</span><span class=p>());</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>struct</span> <span class=nc>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>source</span>: <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w>    </span><span class=n>events</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=p>,</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>tokens</span>: <span class=kp>&amp;</span><span class=na>&#39;t</span><span class=w> </span><span class=p>[</span><span class=n>Token</span><span class=o>&lt;</span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>])</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>start</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Marker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>bump</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>at</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>kind</span>: <span class=nc>SyntaxKind</span><span class=p>)</span><span class=w> </span>-&gt; <span class=kt>bool</span> <span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>peek</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>SyntaxKind</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>check</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=n>expect_test</span>::<span class=n>expect</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now <code>Marker</code> and <code>CompletedMarker</code> can’t see inside of <code>Parser</code>, even though they need to be able to. Let’s move the <code>marker</code> module into <code>parser</code>:</p><pre tabindex=0><code class=language-- data-lang=->$ mkdir crates/parser/src/parser
+[dev-dependencies]
+expect-test = &quot;1.0.1&quot;
+</code></pre><p>Run a project-wide search and replace from <code>pub(super)</code> to <code>pub(crate)</code>, since all the occurrences of <code>pub(super)</code> are on items in top-level modules of the <code>parser</code> crate. As such, using <code>pub(super)</code> on these items is equivalent to <code>pub(crate)</code>, with <code>pub(crate)</code> being the more idiomatic choice.</p><p>To prevent all code in the <code>parser</code> crate from being able to see inside of <code>Parser</code>, we’ll move it into its own module.</p><pre><code class=language-rust>// lib.rs
+
+mod event;
+mod expr;
+mod marker;
+mod parser;
+mod sink;
+mod source;
+
+use lexer::Lexer;
+use parser::Parser;
+use rowan::GreenNode;
+use sink::Sink;
+use syntax::SyntaxNode;
+
+pub fn parse(input: &amp;str) -&gt; Parse {
+    // snip
+}
+
+pub struct Parse {
+    green_node: GreenNode,
+}
+
+impl Parse {
+    // snip
+}
+
+#[cfg(test)]
+fn check(input: &amp;str, expected_tree: expect_test::Expect) {
+    let parse = parse(input);
+    expected_tree.assert_eq(&amp;parse.debug_tree());
+}
+</code></pre><pre><code class=language-rust>// crates/parser/src/parser.rs
+
+use crate::event::Event;
+use crate::expr::expr;
+use crate::marker::Marker;
+use crate::source::Source;
+use lexer::Token;
+use syntax::SyntaxKind;
+
+pub(crate) struct Parser&lt;'t, 'input&gt; {
+    source: Source&lt;'t, 'input&gt;,
+    events: Vec&lt;Event&gt;,
+}
+
+impl&lt;'t, 'input&gt; Parser&lt;'t, 'input&gt; {
+    pub(crate) fn new(tokens: &amp;'t [Token&lt;'input&gt;]) -&gt; Self {
+        // snip
+    }
+
+    pub(crate) fn parse(mut self) -&gt; Vec&lt;Event&gt; {
+        // snip
+    }
+
+    pub(crate) fn start(&amp;mut self) -&gt; Marker {
+        // snip
+    }
+
+    pub(crate) fn bump(&amp;mut self) {
+        // snip
+    }
+
+    pub(crate) fn at(&amp;mut self, kind: SyntaxKind) -&gt; bool {
+        // snip
+    }
+
+    pub(crate) fn peek(&amp;mut self) -&gt; Option&lt;SyntaxKind&gt; {
+        // snip
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::check;
+    use expect_test::expect;
+
+    // snip
+}
+</code></pre><p>Now <code>Marker</code> and <code>CompletedMarker</code> can’t see inside of <code>Parser</code>, even though they need to be able to. Let’s move the <code>marker</code> module into <code>parser</code>:</p><pre><code class=language-->$ mkdir crates/parser/src/parser
 $ git mv crates/parser/src/{marker.rs,parser}
-</code></pre><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Token</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>We need to update the imports in <code>marker</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// marker.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>drop_bomb</span>::<span class=n>DropBomb</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>There are some errors in <code>expr.rs</code> about an unresolved import that we can fix:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Let’s modify <code>Parser::new</code> so that it doesn’t have to know how to create a <code>Source</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>new</span><span class=p>(</span><span class=n>source</span>: <span class=nc>Source</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>Self</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=n>source</span><span class=p>,</span><span class=w>
-</span><span class=w>            </span><span class=n>events</span>: <span class=nb>Vec</span>::<span class=n>new</span><span class=p>(),</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>This obligates us to update the main <code>parse</code> function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>lexer</span>::<span class=n>Lexer</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>rowan</span>::<span class=n>GreenNode</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>sink</span>::<span class=n>Sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxNode</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=n>input</span>: <span class=kp>&amp;</span><span class=kt>str</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>tokens</span>: <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>_</span><span class=o>&gt;</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Lexer</span>::<span class=n>new</span><span class=p>(</span><span class=n>input</span><span class=p>).</span><span class=n>collect</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>source</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Source</span>::<span class=n>new</span><span class=p>(</span><span class=o>&amp;</span><span class=n>tokens</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>parser</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Parser</span>::<span class=n>new</span><span class=p>(</span><span class=n>source</span><span class=p>);</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>events</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>parser</span><span class=p>.</span><span class=n>parse</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>sink</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>Sink</span>::<span class=n>new</span><span class=p>(</span><span class=o>&amp;</span><span class=n>tokens</span><span class=p>,</span><span class=w> </span><span class=n>events</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>Parse</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>green_node</span>: <span class=nc>sink</span><span class=p>.</span><span class=n>finish</span><span class=p>(),</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Next, we’ll create a new module, <code>grammar</code>, and move <code>expr</code> into it:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// lib.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>grammar</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>sink</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>source</span><span class=p>;</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/parser/src/grammar.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span></code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ mkdir crates/parser/src/grammar
+</code></pre><pre><code class=language-rust>// lib.rs
+
+mod event;
+mod expr;
+mod parser;
+mod sink;
+mod source;
+</code></pre><pre><code class=language-rust>// parser.rs
+
+pub(crate) mod marker;
+
+use crate::event::Event;
+use crate::expr::expr;
+use crate::source::Source;
+use lexer::Token;
+use marker::Marker;
+use syntax::SyntaxKind;
+</code></pre><p>We need to update the imports in <code>marker</code>:</p><pre><code class=language-rust>// marker.rs
+
+use super::Parser;
+use crate::event::Event;
+use drop_bomb::DropBomb;
+use syntax::SyntaxKind;
+</code></pre><p>There are some errors in <code>expr.rs</code> about an unresolved import that we can fix:</p><pre><code class=language-rust>// expr.rs
+
+use crate::parser::marker::CompletedMarker;
+use crate::parser::Parser;
+use syntax::SyntaxKind;
+</code></pre><p>Let’s modify <code>Parser::new</code> so that it doesn’t have to know how to create a <code>Source</code>:</p><pre><code class=language-rust>// parser.rs
+
+pub(crate) mod marker;
+
+use crate::event::Event;
+use crate::expr::expr;
+use crate::source::Source;
+use marker::Marker;
+use syntax::SyntaxKind;
+
+// snip
+
+impl&lt;'t, 'input&gt; Parser&lt;'t, 'input&gt; {
+    pub(crate) fn new(source: Source&lt;'t, 'input&gt;) -&gt; Self {
+        Self {
+            source,
+            events: Vec::new(),
+        }
+    }
+
+    // snip
+}
+</code></pre><p>This obligates us to update the main <code>parse</code> function:</p><pre><code class=language-rust>// lib.rs
+
+mod event;
+mod expr;
+mod parser;
+mod sink;
+mod source;
+
+use lexer::Lexer;
+use parser::Parser;
+use rowan::GreenNode;
+use sink::Sink;
+use source::Source;
+use syntax::SyntaxNode;
+
+pub fn parse(input: &amp;str) -&gt; Parse {
+    let tokens: Vec&lt;_&gt; = Lexer::new(input).collect();
+    let source = Source::new(&amp;tokens);
+    let parser = Parser::new(source);
+    let events = parser.parse();
+    let sink = Sink::new(&amp;tokens, events);
+
+    Parse {
+        green_node: sink.finish(),
+    }
+}
+</code></pre><p>Next, we’ll create a new module, <code>grammar</code>, and move <code>expr</code> into it:</p><pre><code class=language-rust>// lib.rs
+
+mod event;
+mod grammar;
+mod parser;
+mod sink;
+mod source;
+</code></pre><pre><code class=language-rust>// crates/parser/src/grammar.rs
+
+mod expr;
+pub(crate) use expr::expr;
+</code></pre><pre><code class=language-->$ mkdir crates/parser/src/grammar
 $ git mv crates/parser/src/{expr.rs,grammar}
-</code></pre><p>Let’s fix the imports in <code>expr.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=cp>#[cfg(test)]</span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>tests</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>check</span><span class=p>;</span><span class=w>
-</span><span class=w>    </span><span class=k>use</span><span class=w> </span><span class=n>expect_test</span>::<span class=n>expect</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>As we add more and more features to Eldiro, we’ll end up with more and more submodules in <code>grammar</code>. It would be annoying to have the same three lines of imports in each one, so we can move them into <code>grammar</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>And import them from <code>expr.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>use</span><span class=w> </span><span class=k>super</span>::<span class=o>*</span><span class=p>;</span><span class=w>
-</span></code></pre></div><p>Let’s fix the import of <code>expr</code> in <code>parser.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>mod</span> <span class=nn>marker</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>event</span>::<span class=n>Event</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>grammar</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>source</span>::<span class=n>Source</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>marker</span>::<span class=n>Marker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=bp>self</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>        </span><span class=n>grammar</span>::<span class=n>expr</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>It might be nice to extract that little dance we do with <code>SyntaxKind::Root</code> in <code>Parser::parse</code> into its own function:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// grammar.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>mod</span> <span class=nn>expr</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>marker</span>::<span class=n>CompletedMarker</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=k>crate</span>::<span class=n>parser</span>::<span class=n>Parser</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>syntax</span>::<span class=n>SyntaxKind</span><span class=p>;</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>root</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nc>CompletedMarker</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=n>m</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>start</span><span class=p>();</span><span class=w>
-</span><span class=w>    </span><span class=n>expr</span>::<span class=n>expr</span><span class=p>(</span><span class=n>p</span><span class=p>);</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=n>m</span><span class=p>.</span><span class=n>complete</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=n>SyntaxKind</span>::<span class=n>Root</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Now <code>grammar::expr::expr</code> doesn’t need to be <code>pub(crate)</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=mi>0</span><span class=p>);</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Let’s use that <code>root</code> function from <code>grammar</code> in <code>parser</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// parser.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>impl</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=n>Parser</span><span class=o>&lt;</span><span class=na>&#39;t</span><span class=p>,</span><span class=w> </span><span class=na>&#39;input</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=p>(</span><span class=k>crate</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>parse</span><span class=p>(</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Vec</span><span class=o>&lt;</span><span class=n>Event</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=n>grammar</span>::<span class=n>root</span><span class=p>(</span><span class=o>&amp;</span><span class=k>mut</span><span class=w> </span><span class=bp>self</span><span class=p>);</span><span class=w>
-</span><span class=w>        </span><span class=bp>self</span><span class=p>.</span><span class=n>events</span><span class=w>
-</span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=c1>// snip
-</span><span class=c1></span><span class=p>}</span><span class=w>
-</span></code></pre></div><p>Finally, let’s remove the <code>parser</code> module declaration from <code>crates/eldiro/src/lib.rs</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// It’s empty!
-</span></code></pre></div><p>To make everything compile we can re-export <code>parser::parse</code> from <code>eldiro</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=k>pub</span><span class=w> </span><span class=k>mod</span> <span class=nn>parser</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=k>pub</span><span class=w> </span><span class=k>use</span><span class=w> </span><span class=n>parser</span>::<span class=n>parse</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+</code></pre><p>Let’s fix the imports in <code>expr.rs</code>:</p><pre><code class=language-rust>#[cfg(test)]
+mod tests {
+    use crate::check;
+    use expect_test::expect;
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
-</code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
+    // snip
+}
+</code></pre><p>As we add more and more features to Eldiro, we’ll end up with more and more submodules in <code>grammar</code>. It would be annoying to have the same three lines of imports in each one, so we can move them into <code>grammar</code>:</p><pre><code class=language-rust>// grammar.rs
 
-running 18 tests
-..................
-test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+mod expr;
+pub(crate) use expr::expr;
 
+use crate::parser::marker::CompletedMarker;
+use crate::parser::Parser;
+use syntax::SyntaxKind;
+</code></pre><p>And import them from <code>expr.rs</code>:</p><pre><code class=language-rust>use super::*;
+</code></pre><p>Let’s fix the import of <code>expr</code> in <code>parser.rs</code>:</p><pre><code class=language-rust>pub(crate) mod marker;
 
-running 17 tests
-.................
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><p>In reality, though, there isn’t a need anymore for the <code>eldiro</code> crate. Let’s delete it:</p><pre tabindex=0><code class=language-- data-lang=->$ rm -r crates/eldiro
-</code></pre><p>And update <code>eldiro-cli</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro-cli/Cargo.toml</span>
+use crate::event::Event;
+use crate::grammar;
+use crate::source::Source;
+use marker::Marker;
+use syntax::SyntaxKind;
 
-<span class=p>[</span><span class=nx>dependencies</span><span class=p>]</span>
-<span class=nx>parser</span> <span class=p>=</span> <span class=p>{</span><span class=nx>path</span> <span class=p>=</span> <span class=s2>&#34;../parser&#34;</span><span class=p>}</span>
-</code></pre></div><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// crates/eldiro-cli/src/main.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>parser</span>::<span class=n>parse</span><span class=p>;</span><span class=w>
-</span><span class=w></span><span class=k>use</span><span class=w> </span><span class=n>std</span>::<span class=n>io</span>::<span class=p>{</span><span class=bp>self</span><span class=p>,</span><span class=w> </span><span class=n>Write</span><span class=p>};</span><span class=w>
-</span></code></pre></div><p>Now that the <code>eldiro</code> crate doesn’t exist anymore, we can rename <code>eldiro-cli</code> to <code>eldiro</code>:</p><pre tabindex=0><code class=language-- data-lang=->$ git mv crates/{eldiro-cli,eldiro}
-</code></pre><div class=highlight><pre tabindex=0 class=chroma><code class=language-toml data-lang=toml><span class=c># crates/eldiro/Cargo.toml</span>
+// snip
 
-<span class=p>[</span><span class=nx>package</span><span class=p>]</span>
-<span class=nx>name</span> <span class=p>=</span> <span class=s2>&#34;eldiro&#34;</span>
-</code></pre></div><pre tabindex=0><code class=language-- data-lang=->$ cargo t -q --lib
+impl&lt;'t, 'input&gt; Parser&lt;'t, 'input&gt; {
+    // snip
+
+    pub(crate) fn parse(mut self) -&gt; Vec&lt;Event&gt; {
+        let m = self.start();
+        grammar::expr(&amp;mut self);
+        m.complete(&amp;mut self, SyntaxKind::Root);
+
+        self.events
+    }
+
+    // snip
+}
+</code></pre><p>It might be nice to extract that little dance we do with <code>SyntaxKind::Root</code> in <code>Parser::parse</code> into its own function:</p><pre><code class=language-rust>// grammar.rs
+
+mod expr;
+
+use crate::parser::marker::CompletedMarker;
+use crate::parser::Parser;
+use syntax::SyntaxKind;
+
+pub(crate) fn root(p: &amp;mut Parser) -&gt; CompletedMarker {
+    let m = p.start();
+    expr::expr(p);
+
+    m.complete(p, SyntaxKind::Root)
+}
+</code></pre><p>Now <code>grammar::expr::expr</code> doesn’t need to be <code>pub(crate)</code>:</p><pre><code class=language-rust>// expr.rs
+
+pub(super) fn expr(p: &amp;mut Parser) {
+    expr_binding_power(p, 0);
+}
+</code></pre><p>Let’s use that <code>root</code> function from <code>grammar</code> in <code>parser</code>:</p><pre><code class=language-rust>// parser.rs
+
+impl&lt;'t, 'input&gt; Parser&lt;'t, 'input&gt; {
+    // snip
+
+    pub(crate) fn parse(mut self) -&gt; Vec&lt;Event&gt; {
+        grammar::root(&amp;mut self);
+        self.events
+    }
+
+    // snip
+}
+</code></pre><p>Finally, let’s remove the <code>parser</code> module declaration from <code>crates/eldiro/src/lib.rs</code>:</p><pre><code class=language-rust>// It’s empty!
+</code></pre><p>To make everything compile we can re-export <code>parser::parse</code> from <code>eldiro</code>:</p><pre><code class=language-rust>pub mod parser {
+    pub use parser::parse;
+}
+</code></pre><pre><code class=language-toml># crates/eldiro/Cargo.toml
+
+[dependencies]
+parser = {path = &quot;../parser&quot;}
+</code></pre><pre><code class=language-->$ cargo t -q --lib
 
 running 18 tests
 ..................
@@ -571,33 +549,57 @@ test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 running 17 tests
 .................
 test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
-</code></pre><h1 id=a-random-note>A random note</h1><p>Rowan parsers tend to return a <code>CompletedMarker</code> from subparsers, as that gives the parsers that call them the opportunity to call <code>precede</code>. Let’s follow this convention and change the only subparsers that don’t return a <code>CompletedMarker</code>, <code>expr</code> and <code>expr_binding_power</code>:</p><div class=highlight><pre tabindex=0 class=chroma><code class=language-rust data-lang=rust><span class=c1>// expr.rs
-</span><span class=c1></span><span class=w>
-</span><span class=w></span><span class=k>pub</span><span class=p>(</span><span class=k>super</span><span class=p>)</span><span class=w> </span><span class=k>fn</span> <span class=nf>expr</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=n>expr_binding_power</span><span class=p>(</span><span class=n>p</span><span class=p>,</span><span class=w> </span><span class=mi>0</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w></span><span class=k>fn</span> <span class=nf>expr_binding_power</span><span class=p>(</span><span class=n>p</span>: <span class=kp>&amp;</span><span class=nc>mut</span><span class=w> </span><span class=n>Parser</span><span class=p>,</span><span class=w> </span><span class=n>minimum_binding_power</span>: <span class=kt>u8</span><span class=p>)</span><span class=w> </span>-&gt; <span class=nb>Option</span><span class=o>&lt;</span><span class=n>CompletedMarker</span><span class=o>&gt;</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>    </span><span class=kd>let</span><span class=w> </span><span class=k>mut</span><span class=w> </span><span class=n>lhs</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=n>lhs</span><span class=p>(</span><span class=n>p</span><span class=p>)</span><span class=o>?</span><span class=p>;</span><span class=w> </span><span class=c1>// we’ll handle errors later.
-</span><span class=c1></span><span class=w>
-</span><span class=w>    </span><span class=k>loop</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>        </span><span class=kd>let</span><span class=w> </span><span class=n>op</span><span class=w> </span><span class=o>=</span><span class=w> </span><span class=k>match</span><span class=w> </span><span class=n>p</span><span class=p>.</span><span class=n>peek</span><span class=p>()</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>            </span><span class=n>_</span><span class=w> </span><span class=o>=&gt;</span><span class=w> </span><span class=k>return</span><span class=w> </span><span class=nb>None</span><span class=p>,</span><span class=w> </span><span class=c1>// we’ll handle errors later.
-</span><span class=c1></span><span class=w>        </span><span class=p>};</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>
-</span><span class=w>        </span><span class=k>if</span><span class=w> </span><span class=n>left_binding_power</span><span class=w> </span><span class=o>&lt;</span><span class=w> </span><span class=n>minimum_binding_power</span><span class=w> </span><span class=p>{</span><span class=w>
-</span><span class=w>            </span><span class=k>break</span><span class=p>;</span><span class=w>
-</span><span class=w>        </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>        </span><span class=c1>// snip
-</span><span class=c1></span><span class=w>    </span><span class=p>}</span><span class=w>
-</span><span class=w>
-</span><span class=w>    </span><span class=nb>Some</span><span class=p>(</span><span class=n>lhs</span><span class=p>)</span><span class=w>
-</span><span class=w></span><span class=p>}</span><span class=w>
-</span></code></pre></div><h1 id=conclusion>Conclusion</h1><p>As a reward for our efforts I’ve prepared a diagram of the dependency graph of the <code>eldiro</code> crate:</p><pre tabindex=0><code class=language-- data-lang=->$ cargo install cargo-depgraph
+</code></pre><p>In reality, though, there isn’t a need anymore for the <code>eldiro</code> crate. Let’s delete it:</p><pre><code class=language-->$ rm -r crates/eldiro
+</code></pre><p>And update <code>eldiro-cli</code>:</p><pre><code class=language-toml># crates/eldiro-cli/Cargo.toml
+
+[dependencies]
+parser = {path = &quot;../parser&quot;}
+</code></pre><pre><code class=language-rust>// crates/eldiro-cli/src/main.rs
+
+use parser::parse;
+use std::io::{self, Write};
+</code></pre><p>Now that the <code>eldiro</code> crate doesn’t exist anymore, we can rename <code>eldiro-cli</code> to <code>eldiro</code>:</p><pre><code class=language-->$ git mv crates/{eldiro-cli,eldiro}
+</code></pre><pre><code class=language-toml># crates/eldiro/Cargo.toml
+
+[package]
+name = &quot;eldiro&quot;
+</code></pre><pre><code class=language-->$ cargo t -q --lib
+
+running 18 tests
+..................
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+
+running 17 tests
+.................
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+</code></pre><h1 id=a-random-note>A random note</h1><p>Rowan parsers tend to return a <code>CompletedMarker</code> from subparsers, as that gives the parsers that call them the opportunity to call <code>precede</code>. Let’s follow this convention and change the only subparsers that don’t return a <code>CompletedMarker</code>, <code>expr</code> and <code>expr_binding_power</code>:</p><pre><code class=language-rust>// expr.rs
+
+pub(super) fn expr(p: &amp;mut Parser) -&gt; Option&lt;CompletedMarker&gt; {
+    expr_binding_power(p, 0)
+}
+
+fn expr_binding_power(p: &amp;mut Parser, minimum_binding_power: u8) -&gt; Option&lt;CompletedMarker&gt; {
+    let mut lhs = lhs(p)?; // we’ll handle errors later.
+
+    loop {
+        let op = match p.peek() {
+            // snip
+            _ =&gt; return None, // we’ll handle errors later.
+        };
+
+        // snip
+
+        if left_binding_power &lt; minimum_binding_power {
+            break;
+        }
+
+        // snip
+    }
+
+    Some(lhs)
+}
+</code></pre><h1 id=conclusion>Conclusion</h1><p>As a reward for our efforts I’ve prepared a diagram of the dependency graph of the <code>eldiro</code> crate:</p><pre><code class=language-->$ cargo install cargo-depgraph
 $ # install Graphviz however you like
 $ cargo depgraph --all-deps | dot -Tsvg &gt; graph.svg
 </code></pre><p><img src=graph.svg alt="Dependency graph of eldiro crate"></p><p>Green indicates a build dependency, meaning a dependency that is needed to build, but doesn’t contribute any code directly. As you can see, the two direct build dependencies that our crates have both provide procedural macros: logos-derive and num-derive.</p><p>Blue indicates a development dependency, of which we only have one: expect-test.</p><p>In the next part we’ll cover an interesting topic that Rowan is particularly suited to: error recovery, resilience and reporting.</p></main><nav class=page-navigation><div class=prev><p class=hint>Previously</p><a href=https://arzg.github.io/lang/16/>Part Sixteen: Refactoring</a></div><div class=next><p class=hint>Next up</p><a href=https://arzg.github.io/lang/18/>Part Eighteen: Errors</a></div><div style=clear:both></div></nav></body></html>
