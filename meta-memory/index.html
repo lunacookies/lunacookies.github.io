@@ -51,7 +51,7 @@ and the arena’s generation match.</p><pre><code class=language-rust>impl&lt;T&
 	}
 
 	fn get(&amp;self, idx: Idx) -&gt; &amp;T {
-		assert_eq(idx.generation, self.generation);
+		assert_eq!(idx.generation, self.generation);
 		self.data[idx.idx]
 	}
 }
