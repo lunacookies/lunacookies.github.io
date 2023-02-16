@@ -1,0 +1,225 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Dynamic Arrays with Data-Oriented Design · Luna’s Website</title><link rel=stylesheet href=https://arzg.github.io/scss/main.4c416d95677d182817af2141b6cb4189ca1b6ed1bf50c61f50f3812defff2c14.css integrity="sha256-TEFtlWd9GCgXryFBtstBicobbtG/UMYfUPOBLe//LBQ="><script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script></head><body><header><h1>Dynamic Arrays with Data-Oriented Design</h1><p class=subtitle>You ain’t gonna need it … if you’re statically allocating everything, that is</p></header><p>I would say that dynamic arrays are
+the most common container type.
+When programming in a data-oriented style
+where all allocations are done ahead of time,
+dynamic arrays manifested as an explicit type
+like C++’s <code>std::vector</code> or Rust’s <code>Vec&lt;T></code>
+often aren’t even necessary.</p><p>In many cases,
+data-oriented design advocates the use of
+numerous large flat arrays of scalar values.
+A lot of code ends up consisting of
+logic to process items one by one,
+shoving them into those arrays
+along the way.</p><h2 id=the-standard-approach>The standard approach</h2><p>Let’s assume we are using
+a typical general-purpose memory allocator.
+We have three dynamic arrays
+which use a doubling growth strategy.
+The first is filled with <code>a</code>s,
+the second with <code>b</code>s
+and the third with <code>c</code>s.
+If we are in a loop
+appending to these dynamic arrays
+again and again,
+over time our memory would look
+something like this:</p><pre><code>capacity of
+ a   b   c   memory
+=== === === ==================================
+ 1   1   1   abc.............................
+ 2   1   1   .bcaa...........................
+ 2   2   1   bbcaa...........................
+ 2   2   2   bb.aacc.........................
+ 4   2   2   bb...ccaaaa.....................
+ 4   4   2   bbbb.ccaaaa.....................
+ 4   4   4   bbbb...aaaacccc.................
+ 8   4   4   bbbb.......ccccaaaaaaaa.........
+ 8   8   4   bbbbbbbb...ccccaaaaaaaa.........
+ 8   8   8   bbbbbbbb.......aaaaaaaacccccccc.
+</code></pre><p>Notice how we keep having to
+copy the arrays around in memory;
+this is bad for performance.
+Also, note how we don’t use
+our available memory perfectly:
+holes start to build up over time,
+echoes of where things used to be.
+Keeping track of which chunks of memory
+are used and which ones aren’t
+takes memory in and of itself too,
+not to mention the performance cost
+of having to search for
+a gap big enough for
+whatever we’re currently allocating.</p><h2 id=a-simpler-more-efficient-approach>A simpler, more efficient approach</h2><p>All this goes away if we statically allocate everything:
+let’s choose a reasonable upper limit
+to how many items we can have,
+and allocate enough space for that many.</p><p>Let’s say 9 is our limit:</p><pre><code>capacity of
+ a   b   c   memory
+=== === === ==================================
+ 9   9   9   aaaaaaaaabbbbbbbbbccccccccc.....
+</code></pre><p>We go through each of our elements,
+putting them in the reserved space.
+Let’s say we end up using only 5 slots
+out of the available 9:</p><pre><code>capacity of
+ a   b   c   memory
+=== === === ==================================
+ 9   9   9   aaaaaaaaabbbbbbbbbccccccccc.....
+             ^^^^^    ^^^^^    ^^^^^
+</code></pre><p>We’re wasting a lot of memory here,
+more than forty percent!</p><p>When programming in a style
+where everything is statically allocated,
+it’s common to have two memory blocks:
+one is permanent memory
+(where we keep things we need to look at
+later in the program’s runtime),
+and the other is temporary memory
+(where we keep things momentarily
+during processing).</p><p>Let’s actually use temporary memory
+to store these maximum-size arrays:</p><pre><code> temporary memory
+==================================
+ aaaaaaaaabbbbbbbbbccccccccc.....
+ ^^^^^    ^^^^^    ^^^^^
+
+ permanent memory
+==================================
+ ................................
+</code></pre><p>We can now,
+using just three <code>memcpy</code>s,
+copy the used portion into permanent memory.
+Let’s also reset the temporary memory,
+since we don’t need it anymore.</p><pre><code> temporary memory
+==================================
+ ................................
+
+ permanent memory
+==================================
+ aaaaabbbbbccccc.................
+ ^^^^^^^^^^^^^^^
+</code></pre><p>100% utilization!</p><p>In the typical grow-as-you-go approach,
+getting to the point where we can hold
+five items in each array
+would’ve taken nine <code>memcpy</code> calls,
+resulting in the following memory layout:</p><pre><code> memory
+==================================
+ bbbbbbbb.......aaaaaaaacccccccc.
+ ^^^^^          ^^^^^   ^^^^^
+</code></pre><p>Of course, Rust’s <code>Vec&lt;T></code> for instance
+has a method called <code>shrink_to_fit</code>
+which, as the name suggests,
+will resize the backing allocation
+so there’s no spare capacity.
+Calling that on each of the three arrays
+would result in this layout:</p><pre><code>capacity of
+ a   b   c   memory
+=== === === ==================================
+ 8   8   8   bbbbbbbb.......aaaaaaaacccccccc.
+             ^^^^^          ^^^^^   ^^^^^
+ 5   8   8   bbbbbbbbaaaaa..........cccccccc.
+             ^^^^^   ^^^^^          ^^^^^
+ 5   5   8   bbbbb...aaaaa..........cccccccc.
+             ^^^^^   ^^^^^          ^^^^^
+ 5   5   5   bbbbb...aaaaaccccc..............
+             ^^^^^   ^^^^^^^^^^
+</code></pre><h2 id=memory-fragmentation>Memory fragmentation</h2><p>Having these gaps in our address space
+isn’t bad only because it means
+that memory is less likely to be used at all.
+If, later, we allocate something that needs
+three or fewer dots’ worth of space,
+then it’ll go into that gap
+between the <code>b</code>s and the <code>a</code>s.</p><pre><code> memory
+==================================
+ bbbbbxx.aaaaaccccc..............
+ ^^^^^^^ ^^^^^^^^^^
+</code></pre><p>There’s a good chance that
+everything else being allocated during that time
+is further along in the address space
+where there’s more free space
+for larger allocations.</p><pre><code> memory
+=================== a big gap ========
+ bbbbbxx.aaaaaccccc           yyyyyyy
+ ^^^^^^^ ^^^^^^^^^^           ^^^^^^^
+</code></pre><p>Things that are allocated together
+are likely to later be accessed together
+[citation needed].
+By having the <code>x</code>s separated from the <code>y</code>s
+by such a long distance in memory
+&ndash; even though they were allocated at the same time! &ndash;
+we’ve worsened cache locality,
+which could cause cache misses
+and degrade performance.</p><p>If, on the other hand,
+we had used the preallocated approach &mldr;</p><pre><code> permanent memory
+================ a big gap  ==========
+ aaaaabbbbbccccc            xxyyyyyyy
+ ^^^^^^^^^^^^^^^            ^^^^^^^^^
+</code></pre><p>&mldr; then everything is packed optimally
+for memory usage and performance.</p><h2 id=okay-but-why-dont-i-need-a-dynamic-array-type>Okay, but why don’t I need a dynamic array type?</h2><p>A nice way to implement
+the strategy I’ve just described
+is to use a bump allocator.
+Let’s see a basic implementation of one in C:</p><pre><code class=language-c>#include &lt;assert.h&gt;
+#include &lt;stddef.h&gt;
+
+typedef struct bump {
+	char *ptr;
+	size_t remaining;
+} bump;
+
+void *bump_allocate(bump *b, size_t size)
+{
+	// die if we run out of space
+	assert(b-&gt;remaining &gt;= size);
+
+	void *p = b-&gt;ptr;
+	b-&gt;ptr += size;
+	b-&gt;remaining -= size;
+	return p;
+}
+</code></pre><p>We can just use bump allocators
+instead of a dynamic array type,
+since there’s no growing involved anymore.
+Let’s first create bump allocators
+for the <code>a</code>s, <code>b</code>s, and <code>c</code>s:</p><pre><code class=language-c>typedef struct a { /* ... */ } a;
+typedef struct b { /* ... */ } b;
+typedef struct c { /* ... */ } c;
+
+#define MAX_CAPACITY 9
+
+bump bump_create_sub_allocator(bump *b, size_t size)
+{
+	void *buf = bump_allocate(b, size);
+	return (bump){
+		.ptr = buf,
+		.remaining = size,
+	};
+}
+
+void do_thing(
+	bump *temp_memory,
+	bump *permanent_memory)
+{
+	bump as = bump_create_sub_allocator(temp_memory, sizeof(a) * MAX_CAPACITY);
+	bump bs = bump_create_sub_allocator(temp_memory, sizeof(b) * MAX_CAPACITY);
+	bump cs = bump_create_sub_allocator(temp_memory, sizeof(c) * MAX_CAPACITY);
+}
+</code></pre><p>And this is how we fill our bump allocators up with data:</p><pre><code class=language-c>void do_thing(
+	bump *temp_memory,
+	bump *permanent_memory)
+{
+	bump as = bump_create_sub_allocator(temp_memory, sizeof(a) * MAX_CAPACITY);
+	bump bs = bump_create_sub_allocator(temp_memory, sizeof(b) * MAX_CAPACITY);
+	bump cs = bump_create_sub_allocator(temp_memory, sizeof(c) * MAX_CAPACITY);
+
+	// in Rust we would do
+	as.push(my_a);
+
+	// but in this style we do
+	a *a_ptr = bump_allocate(&amp;as, sizeof(a));
+	*a_ptr = my_a;
+}
+</code></pre><p>And voilà!
+With this approach we have
+near-instant allocation,
+lower memory usage,
+better cache locality
+and fewer <code>memcpy</code> calls,
+all without the need for
+generics or binary-bloating monomorphization.</p><p class=signature><a href=https://arzg.github.io/>Luna Razzaghipour</a><br>16 February 2023</p><footer><p>Thoughts, comments, corrections or suggestions?
+<a href=mailto:lunarazzaghipour@gmail.com>Email&nbsp;me!</a>
+I’d&nbsp;like nothing more than to hear from you.</p></footer></body></html>
