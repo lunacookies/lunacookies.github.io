@@ -1,0 +1,286 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Side-Effectful Expressions in C · Luna’s Website</title><link rel=stylesheet href=https://lunacookies.github.io/scss/main.86269e87b5fdab19c3c99b4187868ff7c6b486cae7c766d5571b80f8a09556f9.css integrity="sha256-hiaeh7X9qxnDyZtBh4aP98a0hsrnx2bVVxuA+KCVVvk="><style>@font-face{font-display:swap;font-family:input-mono;font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/f1b774/00000000000000007735b11b/30/l?fvd=n4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono;font-style:italic;font-weight:400;src:url(https://use.typekit.net/af/c3093e/00000000000000007735b116/30/l?fvd=i4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/62782e/00000000000000007735b12a/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/038dc3/00000000000000007735b127/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono-narrow;font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/2b5bd5/00000000000000007735b119/30/l?fvd=n4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono-narrow;font-style:italic;font-weight:400;src:url(https://use.typekit.net/af/41f034/00000000000000007735b11d/30/l?fvd=i4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono-narrow;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/84e6b2/00000000000000007735b12d/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:input-mono-narrow;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/de623c/00000000000000007735b12c/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-headline;font-stretch:normal;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/0a3f36/00000000000000007735f3b6/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-headline;font-stretch:normal;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/b3b3f5/00000000000000007735f3b4/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-1;font-stretch:normal;font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/6ad56d/00000000000000007735f551/30/l?fvd=n4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-1;font-stretch:normal;font-style:italic;font-weight:400;src:url(https://use.typekit.net/af/416556/00000000000000007735f553/30/l?fvd=i4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-1;font-stretch:normal;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/216316/00000000000000007735f546/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-1;font-stretch:normal;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/fd31cc/00000000000000007735f54d/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-2;font-stretch:normal;font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/6882f5/00000000000000007735f554/30/l?fvd=n4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-2;font-stretch:normal;font-style:italic;font-weight:400;src:url(https://use.typekit.net/af/eee2f8/00000000000000007735f54e/30/l?fvd=i4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-2;font-stretch:normal;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/acf8fe/00000000000000007735f54b/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-2;font-stretch:normal;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/414cb7/00000000000000007735f555/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-3;font-stretch:normal;font-style:normal;font-weight:400;src:url(https://use.typekit.net/af/8167f1/00000000000000007735f54f/30/l?fvd=n4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-3;font-stretch:normal;font-style:italic;font-weight:400;src:url(https://use.typekit.net/af/365641/00000000000000007735f550/30/l?fvd=i4&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-3;font-stretch:normal;font-style:normal;font-weight:700;src:url(https://use.typekit.net/af/7bcdd2/00000000000000007735f552/30/l?fvd=n7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}@font-face{font-display:swap;font-family:guyot-press-3;font-stretch:normal;font-style:italic;font-weight:700;src:url(https://use.typekit.net/af/add0a5/00000000000000007735f547/30/l?fvd=i7&primer=7cdcb44be4a7db8877ffa5c0007b8dd865b3bbc383831fe2ea177f62257a9191&v=3)format("woff2")}</style><script src=https://unpkg.com/prismjs@1.25.0/components/prism-core.min.js></script>
+<script src=https://unpkg.com/prismjs@1.25.0/plugins/autoloader/prism-autoloader.min.js></script></head><body><header><h1>Side-Effectful Expressions in C</h1><p class=subtitle>I am desperately seeking validation for my difficulty in understanding some overly-terse K&amp;R-style one-line loops.</p></header><main><p>This article began from a list of reasons I was making
+which purportedly justify my years-long (and so far fruitless!)
+pursuit of writing my own systems programming language compiler.
+More concretely, I was making a list of gripes I have with C.
+I sorted them into two groups:
+changes that would improve the safety of the language,
+and changes that would help maintain the sanity of users and implementers.
+Now, <em>sure,</em> using a language where</p><pre><code class=language-c>#include &lt;stdint.h&gt;
+#include &lt;stdio.h&gt;
+
+int main()
+{
+	uint64_t foo = 5327584392;
+	uint16_t bar = foo; // implicit narrowing cast!
+	printf(&quot;%u\n&quot;, bar);
+}
+</code></pre><p>compiles without warnings by default
+(given that “default” means <code>clang -Wall</code>
+and doesn’t include digging through the big list of diagnostics
+to find which ones you think are reasonable
+and would really quite like to add to your build system)
+is not particularly conducive to sanity.
+You might say that safety is part of sanity,
+and I’d agree with that.
+However, for the purposes of my list,
+anything to do with program correctness goes in the first bucket,
+anything related to scraping off barnacles goes in the second bucket,
+aaaand I didn’t include anything else.</p><p>In this article I’ll be focusing on
+two features of C that made my list &ndash;
+assignment expressions and pre/post-increment/decrement expressions
+&ndash; and why I think they’re problematic.</p><h2 id=some-philosophizing>Some philosophizing</h2><p>First, we need to understand
+the dichotomy between statements and expressions.
+As any functional programmer can tell you,
+expressions are trivially nestable,
+which is what makes them so flexible and expressive.
+Although statements are capable of nesting in some circumstances,
+they don’t have the propensity to do so
+to nearly the same degree as expressions.
+How many layers of <code>if</code>s and <code>while</code>s do you usually see?
+Not a lot.
+Something like <code>a.factor * f(b.foo, b.bar / 2) + 1</code>,
+on the other hand,
+is commonplace,
+and that has at its deepest point four levels of nesting!</p><p>At its core, this difference comes down to something more fundamental:
+in a purely functional programming language,
+statements do not exist.
+(Yes I know there are probably exceptions, but roll with me here.)
+Of course, this is because statements exist only to perform side effects,
+which you can’t have in pure FP-land.
+Conversely, the purpose of an expression is to perform a computation.</p><p>Computations are expressed so naturally as a tree of expressions
+because we often want to express complex computations made of many parts.
+To reuse the example from earlier: who wants to write</p><pre><code>foo = b.foo
+bar = b.bar
+half_bar = bar / 2
+thing = f(foo, half_bar)
+factor = a.factor
+factored_thing = factor * thing
+result = factored_thing + 1
+</code></pre><p>instead of <code>a.factor * f(b.foo, b.bar / 2) + 1</code>?</p><p>Side effects, on the other hand, are fundamentally about
+“do that thing, then do this thing”.
+Once you stray from simple straight-line code to
+a <code>switch</code> inside an <code>if</code> statement inside a <code>while</code> loop
+inside a <code>for</code> loop inside an <code>if</code> statement,
+code becomes hard for humans to understand.</p><p>I argue that there is
+something fundamental about computation
+that lends it to being represented as a tree,
+and something fundamental about side effects
+that lend them to being represented as a sequence of operations.</p><p>This sounds a lot like another dichotomy we’re familiar with &ndash;
+functional versus imperative programming.
+In pure functional programming,
+we build up trees of expressions and give them names,
+all of which compose well together because no one part has side effects.
+I can move a function call from <em>here</em> to <em>there</em>
+and everything still works,
+only because I know that the function call
+couldn’t have secretly mutated state that was being read somewhere.
+Imperative programming involves
+building up series of instructions for the computer &ndash; statements &ndash;
+which are then executed in the order we specify.
+If I reorder some statements the program may no longer work as intended.</p><p>Moreover, trees are not good at expressing <em>order.</em>
+Sure, you can define an order in which a tree of expressions will execute,
+but this isn’t as easy for humans to reason about
+as a flat sequence of statements is.
+In fact, the C standard leaves expression evaluation order
+undefined in many cases
+(such as function arguments and binary operators)!</p><p>Now, how does this dichotomy relate to C?
+Let’s think back to those two troublesome expressions
+I mentioned in the beginning of this article:
+assignment and pre/post-increment/decrement.
+The thing with these two that makes them hard to reason about
+is their side-effectful nature.
+Indeed, many (most?) C-like languages omit them,
+replacing both with regular statements.
+To demonstrate this I’ve prepared a few small examples.</p><h2 id=example-one----powi>Example one &ndash; <code>powi()</code></h2><p>First, we have <code>powi()</code>,
+a function which raises an integer to an integer power.
+In <code>main()</code> we call this function while using a pre-increment expression.</p><pre><code class=language-c>#include &lt;stdio.h&gt;
+
+int powi(int x, int y)
+{
+	int result = 1;
+	while (y &gt; 0) {
+		y--;
+		result *= x;
+	}
+	return result;
+}
+
+int main()
+{
+	int x = 5;
+	printf(&quot;%d\n&quot;, ++x * powi(x, 2));
+}
+</code></pre><p>Not only is the runtime behavior of this program non-obvious
+(<code>powi()</code> looks like it’s being passed <code>5</code>
+since that appears to be the value of <code>x</code> at first glance),
+but it’s also undefined:
+the C standard does not specify whether
+the left-hand side or the right-hand side of a binary operation
+is evaluated first.
+Clang warns us about this:</p><pre><code>$ clang demo.c
+demo.c:16:17: warning: unsequenced modification and access to 'x' [-Wunsequenced]
+        printf(&quot;%d\n&quot;, ++x * powi(x, 2));
+                       ^          ~
+1 warning generated.
+</code></pre><p>It’s important to note here that
+what’s making this hard to understand is that we have
+buried a side effect within a tree
+instead of laying it out plainly in a sequence of statements.
+If we transform <code>main()</code> from above to not use a pre-increment expression, we
+get:</p><pre><code class=language-c>int main()
+{
+	int x = 5;
+	x++;
+	printf(&quot;%d\n&quot;, x * powi(x, 2));
+}
+</code></pre><p>Here, it’s blindingly obvious what the behavior of the program is.</p><p>You might have noticed we can apply the reverse transformation to <code>powi()</code>
+as we just applied to <code>main()</code>.
+To start, we can replace <code>y > 0</code> with <code>y != 0</code>:</p><pre><code class=language-c>int powi(int x, int y)
+{
+	int result = 1;
+	while (y != 0) {
+		y--;
+		result *= x;
+	}
+	return result;
+}
+</code></pre><p><code>while (y != 0)</code> is equivalent to <code>while (y)</code> &mldr;</p><pre><code class=language-c>int powi(int x, int y)
+{
+	int result = 1;
+	while (y) {
+		y--;
+		result *= x;
+	}
+	return result;
+}
+</code></pre><p>&mldr; which finally lets us fold the decrement into the loop condition:</p><pre><code class=language-c>int powi(int x, int y)
+{
+	int result = 1;
+	while (y--) {
+		result *= x;
+	}
+	return result;
+}
+</code></pre><p>For true C-style terseness let’s get rid of those braces too:</p><pre><code class=language-c>int powi(int x, int y)
+{
+	int result = 1;
+	while (y--) result *= x;
+	return result;
+}
+</code></pre><p>This sort of code style can be traced back all the way to K&amp;R,
+which uses it extensively.</p><h2 id=example-two----krs-itoa>Example two &ndash; K&amp;R’s <code>itoa()</code></h2><p>Take a look at this implementation of <code>itoa()</code> from K&amp;R:</p><pre><code class=language-c>void itoa(int n, char s[])
+{
+	int i, sign;
+
+	if ((sign = n) &lt; 0)  /* record sign */
+		n = -n;      /* make n positive */
+	i = 0;
+	do {        /* generate digits in reverse order */
+		s[i++] = n % 10 + '0';   /* get next digit */
+	} while ((n /= 10) &gt; 0);         /* delete it */
+	if (sign &lt; 0)
+		s[i++] = '-';
+	s[i] = '\0';
+	reverse(s);
+}
+</code></pre><p>We have two assignments hidden in conditions,
+as well as two more assignments hidden within indexing
+in the form of post-increment expressions.
+Below I’ve rewritten the function to remove both of these:</p><pre><code class=language-c>void itoa(int n, char s[])
+{
+	int i, sign;
+
+	sign = n;              /* record sign */
+	if (sign &lt; 0) n = -n;  /* make n positive */
+
+	i = 0;
+
+	/* generate digits in reverse order */
+	do {
+		s[i] = n % 10 + '0';   /* get next digit */
+		n /= 10;               /* delete it */
+		i++;
+	} while (n &gt; 0);
+
+	if (sign &lt; 0) {
+		s[i] = '-';
+		i++;
+	}
+
+	s[i] = '\0';
+	reverse(s);
+}
+</code></pre><p>I find this far clearer than the original code,
+which takes a bit longer to fully grasp
+due to how the acts of calculating things (expressions)
+and changing things (statements)
+are intermingled.</p><p>It’s not all bad, though.
+In particular, I really like the <code>s[i++]</code> idiom &ndash;
+writing a byte and moving forward to the next byte
+can for many purposes be treated as a single operation.
+You wouldn’t blink twice if <code>s[i++] = '-';</code> was replaced with <code>buf.put('-');</code>
+in a language with methods.</p><p>Note that this still isn’t how I’d write the code myself
+(especially in regards to formatting!),
+but that’s beside the point:
+we aren’t here to discuss what the prettiest implementation of <code>itoa</code> is.</p><h2 id=example-three----memcpy>Example three &ndash; <code>memcpy()</code></h2><p>An oft-cited [citation needed] implementation of <code>memcpy()</code>
+reads something like the following:</p><pre><code class=language-c>void *memcpy(void *dst, const void *src, size_t n)
+{
+	const uint8_t *s = src;
+	uint8_t *d = dst;
+	while (n--) *d++ = *s++;
+	return dst;
+}
+</code></pre><p>Ignoring how we need to mess with the pointer types
+(pointer arithmetic on <code>void *</code> is undefined behavior)
+and have to return the original destination pointer,
+this is a remarkably terse implementation;
+it only takes a single line to write the core loop.
+Of course, something like</p><pre><code class=language-c>void *memcpy(void *dst, const void *src, size_t n)
+{
+	const uint8_t *s = src;
+	uint8_t *d = dst;
+
+	while (n &gt; 0) {
+		*d = *s;
+		d++;
+		s++;
+		n--;
+	}
+
+	return dst;
+}
+</code></pre><p>is more explicit and probably clearer,
+but something about the first is unquestionably elegant.</p><h2 id=an-aside-about-yoda-conditions>An aside about Yoda conditions</h2><p>No discussion which mentions C’s assignment expressions
+would be complete without at least a cursory nod towards Yoda conditions.
+Because C lets you use any integer type as a condition,
+and since the assignment expression returns the value that was assigned,
+it’s possible to make typos like this:</p><pre><code class=language-c>if (x = 10) {
+	do_stuff(x);
+	something_else();
+	do_more_stuff(x);
+}
+</code></pre><p>Here, presumably, the programmer forgot an extra equals sign.
+This yields no compile error by default and,
+to make matters more confusing for whatever poor soul ends up debugging this,
+mutates a variable unexpectedly and
+will only run the <code>if</code> when the assigned value is not zero.</p><p>The traditional way to overcome this is to
+always write conditions in the form <code>if (10 == x)</code>;
+if an equals sign is left out, then a compile error is reported.</p><h2 id=verdict>Verdict</h2><p>Overall, I’m sure that there exists some very elegant code
+which uses pre/post-increment/decrement and assignment expressions
+to great effect.
+Admittedly, I still feel like there is a certain indelible quality to
+the K&amp;R-esque style of C code I was disparaging above.
+You can get a lot done with very few characters
+if you pause a few seconds to understand the code fully.
+It can lead to particularly elegant results
+when processing data byte-by-byte
+in the classic Unix style using <code>getc()</code>, <code>putc()</code> & co.</p><p>However, in my opinion the cost in readability and understandability
+beyond the simplest of cases
+isn’t worth the improvement in brevity.</p><p>You might have noticed how throughout this post
+when I purported to remove pre/post-increment/decrement expressions,
+I still left them in!
+That’s because, if <code>i++</code> is restricted to being allowed as a statement only,
+then it poses no harm and is merely a bit nicer to type than <code>i += 1</code>.</p><p class=signature><a href=https://lunacookies.github.io/>Luna Razzaghipour</a><br>24 April 2023</p></main><footer><p>Thoughts, comments, corrections or suggestions?
+<a href=mailto:lunarazzaghipour@gmail.com>Email&nbsp;me!</a>
+I’d&nbsp;like nothing more than to hear from you.</p></footer></body></html>
